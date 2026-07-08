@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Reports — PropSight{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Reports</h1>
+<p class="text-sm mb-6" style="color: var(--ink-2);">
+  Reports live in server memory only — they disappear on restart or discard.
+</p>
+
+{% if error %}
+<div class="card p-4 mb-4 text-sm" style="color: var(--critical);">{{ error }}</div>
+{% endif %}
+
+{% if reports %}
+<div class="space-y-3">
+  {% for r in reports %}
+  <div class="card p-4 flex items-center gap-4" id="report-{{ r.report_id }}">
+    <div class="flex-1">
+      <div class="flex items-center gap-2">
+        {% if r.status == "ready" %}
+        <a href="/reports/{{ r.report_id }}" class="font-medium hover:underline">{{ r.files | join(", ") }}</a>
+        <span class="text-xs px-2 py-0.5 rounded-full text-white" style="background: var(--good);">ready</span>
+        {% else %}
+        <span class="font-medium">{{ r.files | join(", ") }}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full text-white" style="background: var(--warning);">draft — property types not confirmed</span>
+        {% endif %}
+      </div>
+      <div class="text-xs mt-1" style="color: var(--muted);">
+        {{ r.row_count }} rows · created {{ r.created_at }}
+      </div>
+    </div>
+    <button class="discard-btn text-sm px-3 py-1.5 rounded-lg border"
+            style="color: var(--critical); border-color: var(--border);"
+            data-id="{{ r.report_id }}">Discard</button>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card p-10 text-center">
+  <p style="color: var(--ink-2);">No reports in memory.</p>
+  <a href="/upload" class="inline-block mt-3 px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: var(--series-1);">Upload workbooks</a>
+</div>
+{% endif %}
+
+<script src="/static/app.js"></script>
+<script>
+document.querySelectorAll('.discard-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Discard this report? This cannot be undone.')) return;
+    await withBtnLoading(btn, 'Discarding…', async () => {
+      const res = await fetch(`/reports/${btn.dataset.id}`, { method: 'DELETE' });
+      if (res.ok) document.getElementById(`report-${btn.dataset.id}`).remove();
+    });
+  });
+});
+</script>
+{% endblock %}

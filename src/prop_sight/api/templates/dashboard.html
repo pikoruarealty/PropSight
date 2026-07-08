@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — PropSight{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-1">
+  <h1 class="text-2xl font-semibold">Lead dashboard</h1>
+  <span id="report-files" class="text-xs" style="color: var(--muted);"></span>
+  <button onclick="window.print()" class="ml-auto text-sm px-3 py-1.5 border rounded-md hide-on-print" style="border-color: var(--border); color: var(--ink-2); background: var(--surface-1);">
+    📄 Download PDF
+  </button>
+</div>
+<p class="text-sm mb-5" style="color: var(--ink-2);">Budget · Configuration · HWC · Call & Buying status</p>
+
+<div id="loading" class="text-sm flex items-center gap-2" style="color: var(--muted);"><span class="spinner"></span> Loading report…</div>
+
+<div id="dashboard" class="hidden space-y-5">
+
+  <!-- Hero KPIs -->
+  <div id="hero-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+  <!-- Segment + property-type + file filters -->
+  <div class="flex flex-wrap items-center gap-3">
+    <div id="focus-chips" class="flex flex-wrap gap-2"></div>
+    <div id="file-tabs"   class="flex flex-wrap gap-2"></div>
+    <div id="type-tabs"   class="flex flex-wrap gap-2 ml-auto"></div>
+  </div>
+
+  <!-- Row 1: HWC donut + Budget -->
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="card p-5" id="card-hwc-donut"></div>
+    <div class="card p-5" id="card-budget"></div>
+  </div>
+
+  <!-- Row 2: Configuration + Call status + Buying status -->
+  <div class="grid md:grid-cols-3 gap-5">
+    <div class="card p-5" id="card-configuration"></div>
+    <div class="card p-5" id="card-call-status"></div>
+    <div class="card p-5" id="card-buying-status"></div>
+  </div>
+
+  <!-- Cross-tab matrices -->
+  <div class="card p-5" id="card-config-budget"></div>
+
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="card p-5" id="card-hwc-config"></div>
+    <div class="card p-5" id="card-hwc-budget"></div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="card p-5" id="card-buying-config"></div>
+    <div class="card p-5" id="card-call-buying"></div>
+  </div>
+
+
+  <!-- AI insights (Groq) -->
+  <div class="card p-5" id="card-insights"></div>
+
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+  window.REPORT_ID = "{{ report_id }}";
+  initDashboard();
+</script>
+{% endblock %}

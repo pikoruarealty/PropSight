@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PropSight{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --surface-1: #fcfcfb;
+      --page: #f9f9f7;
+      --ink: #0b0b0b;
+      --ink-2: #52514e;
+      --muted: #898781;
+      --grid: #e1e0d9;
+      --baseline: #c3c2b7;
+      --border: rgba(11,11,11,0.10);
+      --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100;
+      --series-4: #008300; --series-5: #4a3aa7; --series-6: #e34948;
+      --series-7: #e87ba4; --series-8: #eb6834;
+      --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    }
+    body { background: var(--page); color: var(--ink); font-family: "Inter", system-ui, -apple-system, sans-serif; }
+    .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 0.75rem; }
+    .bar-track { background: transparent; }
+    .bar-fill { border-radius: 0 4px 4px 0; height: 14px; min-width: 2px; }
+    .tab-active { background: var(--ink); color: #fff; }
+    table.matrix td, table.matrix th { border: 1px solid var(--grid); padding: 6px 12px; font-variant-numeric: tabular-nums; }
+    .spinner {
+      display: inline-block; width: 1em; height: 1em; border-radius: 50%;
+      border: 2px solid currentColor; border-right-color: transparent;
+      animation: spin 0.7s linear infinite; vertical-align: -0.15em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    [data-loading="true"] { opacity: 0.7; pointer-events: none; }
+    .skeleton {
+      background: linear-gradient(90deg, var(--grid) 25%, var(--baseline) 37%, var(--grid) 63%);
+      background-size: 400% 100%; animation: skeleton-shimmer 1.4s ease infinite;
+      border-radius: 0.5rem;
+    }
+    @keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+    @media print {
+      body { background: white; color: black; font-size: 12pt; }
+      nav, .hide-on-print, #focus-chips, #type-tabs, #file-tabs, #report-files { display: none !important; }
+      .card { border: none !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 24px; padding: 0 !important; }
+      main { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
+      canvas { max-width: 100% !important; }
+      .bar-track { background: var(--grid); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+  <nav class="border-b" style="background: var(--surface-1); border-color: var(--border);">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
+      <a href="/" class="font-semibold text-lg">🏠 PropSight</a>
+      <div class="flex gap-4 text-sm" style="color: var(--ink-2);">
+        <a href="/upload" class="hover:underline">Upload</a>
+        <a href="/reports" class="hover:underline">Reports</a>
+      </div>
+    </div>
+  </nav>
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
