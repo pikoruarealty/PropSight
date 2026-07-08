@@ -95,7 +95,10 @@ document.getElementById('upload-btn').addEventListener('click', async (e) => {
   await withBtnLoading(btn, 'Parsing…', async () => {
     try {
       const res = await fetch('/upload', { method: 'POST', body: form });
-      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server error: ${res.status} ${res.statusText}`);
+      }
       draft = await res.json();
       status.classList.add('hidden');
       renderConfirm();
@@ -187,7 +190,10 @@ document.getElementById('confirm-btn').addEventListener('click', async (e) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheets }),
       });
-      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server error: ${res.status} ${res.statusText}`);
+      }
       window.location.href = `/reports/${draft.report_id}`;
     } catch (err) {
       errBox.textContent = '⚠ ' + err.message;

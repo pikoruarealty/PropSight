@@ -22,7 +22,10 @@ def read_workbook(contents: bytes, filename: str) -> dict[str, pd.DataFrame]:
             df = pd.read_csv(io.BytesIO(contents), encoding="latin1")
             sheets = {filename: df}
     else:
-        sheets = pd.read_excel(io.BytesIO(contents), sheet_name=None, engine="openpyxl")
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            sheets = pd.read_excel(io.BytesIO(contents), sheet_name=None, engine="openpyxl")
         
     cleaned: dict[str, pd.DataFrame] = {}
     for name, df in sheets.items():
