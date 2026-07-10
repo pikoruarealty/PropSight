@@ -1,64 +1,145 @@
 {% extends "base.html" %}
+{% set active_nav = 'dashboard' %}
 {% block title %}Dashboard — PropSight{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-center gap-3 mb-1">
-  <h1 class="text-2xl font-semibold">Lead dashboard</h1>
-  <span id="report-files" class="text-xs" style="color: var(--muted);"></span>
-  <button onclick="window.print()" class="ml-auto text-sm px-3 py-1.5 border rounded-md hide-on-print" style="border-color: var(--border); color: var(--ink-2); background: var(--surface-1);">
-    📄 Download PDF
-  </button>
+
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-5">
+  <div class="min-w-0">
+    <h1 class="text-[24px] font-bold text-on-surface">
+      {% if is_combined %}All leads{% else %}Lead dashboard{% endif %}
+    </h1>
+    <p class="text-body-sm text-on-surface-variant mt-1">
+      {% if is_combined %}Every uploaded file, merged and deduplicated by mobile number.{% else %}Budget · Configuration · HWC · Call &amp; Buying status{% endif %}
+      <span id="report-files" class="text-outline"></span>
+    </p>
+  </div>
+  <div class="flex items-center gap-1.5 hide-on-print shrink-0">
+    <button id="download-pdf-btn"
+            class="btn-secondary h-8 px-4 flex items-center gap-1.5 text-label-xs">
+      <span class="material-symbols-outlined" style="font-size:16px;">download</span> Download PDF
+    </button>
+    <button id="pdf-config-btn" title="Choose what to export"
+            class="btn-secondary h-8 w-8 flex items-center justify-center">
+      <span class="material-symbols-outlined" style="font-size:18px;">tune</span>
+    </button>
+  </div>
 </div>
-<p class="text-sm mb-5" style="color: var(--ink-2);">Budget · Configuration · HWC · Call & Buying status</p>
 
-<div id="loading" class="text-sm flex items-center gap-2" style="color: var(--muted);"><span class="spinner"></span> Loading report…</div>
+<!-- PDF export section picker -->
+<div id="pdf-config-popup" class="hidden hide-on-print fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+  <div class="bg-surface border border-outline-variant rounded-lg p-5 w-[380px] max-h-[80vh] overflow-y-auto flex flex-col gap-3">
+    <h2 class="text-headline-sm">What to include in the PDF</h2>
+    <div id="pdf-config-options" class="flex flex-col gap-2 text-body-sm"></div>
+    <div class="flex justify-end gap-2 mt-2">
+      <button id="pdf-config-cancel" class="btn-secondary h-8 px-4 text-label-xs">Cancel</button>
+      <button id="pdf-config-save" class="btn-primary h-8 px-4 text-label-xs">Save &amp; export</button>
+    </div>
+  </div>
+</div>
 
-<div id="dashboard" class="hidden space-y-5">
+<div id="loading" class="text-body-sm flex items-center gap-2 text-on-surface-variant">
+  <span class="spinner"></span> Loading report…
+</div>
+
+<div id="dashboard" class="hidden flex flex-col gap-gutter">
 
   <!-- Hero KPIs -->
-  <div id="hero-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+  <div id="hero-tiles" data-export="hero" data-export-label="Key stats (total leads, HWC-marked, budget, config)"
+       class="grid grid-cols-2 md:grid-cols-4 gap-gutter"></div>
+
+  <!-- What ingestion cleaned up -->
+  <!-- The left rule is a border, not a child element: renderDedupeBanner() owns
+       this node's innerHTML and would wipe any element placed inside it. -->
+  <div id="dedupe-banner"
+       class="hidden bg-surface-container border border-l-4 border-outline-variant border-l-primary
+              rounded-lg px-4 py-3 text-body-sm text-on-surface-variant"></div>
 
   <!-- Segment + property-type + file filters -->
-  <div class="flex flex-wrap items-center gap-3">
+  <div class="hide-on-print flex flex-wrap items-center gap-3 bg-surface border border-outline-variant p-2 rounded-lg">
     <div id="focus-chips" class="flex flex-wrap gap-2"></div>
     <div id="file-tabs"   class="flex flex-wrap gap-2"></div>
     <div id="type-tabs"   class="flex flex-wrap gap-2 ml-auto"></div>
   </div>
 
   <!-- Row 1: HWC donut + Budget -->
-  <div class="grid md:grid-cols-2 gap-5">
+  <div data-export="hwc-budget" data-export-label="HWC & budget overview" class="grid md:grid-cols-2 gap-gutter">
     <div class="card p-5" id="card-hwc-donut"></div>
     <div class="card p-5" id="card-budget"></div>
   </div>
 
   <!-- Row 2: Configuration + Call status + Buying status -->
-  <div class="grid md:grid-cols-3 gap-5">
+  <div data-export="status" data-export-label="Configuration, call & buying status" class="grid md:grid-cols-3 gap-gutter">
     <div class="card p-5" id="card-configuration"></div>
     <div class="card p-5" id="card-call-status"></div>
     <div class="card p-5" id="card-buying-status"></div>
   </div>
 
+  <!-- Lead timing — hidden entirely when no upload carries a usable date -->
+  <section id="time-section" data-export="time" data-export-label="When leads arrive" class="hidden flex flex-col gap-gutter">
+    <h2 class="text-headline-sm pt-2">When leads arrive</h2>
+    <div class="grid md:grid-cols-2 gap-gutter">
+      <div class="card p-5" id="card-time-weekday"></div>
+      <div class="card p-5" id="card-time-hour"></div>
+    </div>
+    <div class="card p-5" id="card-time-heatmap"></div>
+    <div class="card p-5" id="card-time-month"></div>
+  </section>
+
+  <!-- Marketing — hidden unless an upload carries campaign / page attribution -->
+  <section id="marketing-section" data-export="marketing" data-export-label="Where leads come from" class="hidden flex flex-col gap-gutter">
+    <h2 class="text-headline-sm pt-2">Where leads come from</h2>
+    <div class="grid md:grid-cols-3 gap-gutter">
+      <div class="card p-5" id="card-marketing-pages"></div>
+      <div class="card p-5" id="card-marketing-campaigns"></div>
+      <div class="card p-5" id="card-marketing-adsets"></div>
+    </div>
+  </section>
+
+  <!-- Lead classification — hidden until rules classify somebody -->
+  <section id="classification-section" data-export="classification" data-export-label="Good vs bad leads" class="hidden flex flex-col gap-gutter">
+    <div class="flex flex-wrap items-baseline gap-3 pt-2">
+      <h2 class="text-headline-sm">Good vs bad leads</h2>
+      <a href="/sorter" class="text-label-xs text-primary hover:underline">edit rules in the sorter →</a>
+    </div>
+    <div class="grid md:grid-cols-2 gap-gutter">
+      <div class="card p-5" id="card-lead-class"></div>
+      <div class="card p-5" id="card-class-call"></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-gutter">
+      <div class="card p-5" id="card-class-budget"></div>
+      <div class="card p-5" id="card-class-config"></div>
+    </div>
+  </section>
+
   <!-- Cross-tab matrices -->
-  <div class="card p-5" id="card-config-budget"></div>
+  <section data-export="crosstab" data-export-label="Cross-tab relationships" class="flex flex-col gap-gutter">
+    <h2 class="text-headline-sm pt-2">How the fields relate</h2>
+    <div class="card p-5" id="card-config-budget"></div>
 
-  <div class="grid md:grid-cols-2 gap-5">
-    <div class="card p-5" id="card-hwc-config"></div>
-    <div class="card p-5" id="card-hwc-budget"></div>
-  </div>
+    <div class="grid md:grid-cols-2 gap-gutter">
+      <div class="card p-5" id="card-hwc-config"></div>
+      <div class="card p-5" id="card-hwc-budget"></div>
+    </div>
 
-  <div class="grid md:grid-cols-2 gap-5">
-    <div class="card p-5" id="card-buying-config"></div>
-    <div class="card p-5" id="card-call-buying"></div>
-  </div>
+    <div class="grid md:grid-cols-2 gap-gutter">
+      <div class="card p-5" id="card-buying-config"></div>
+      <div class="card p-5" id="card-call-buying"></div>
+    </div>
+  </section>
 
+  <!-- Why some charts cover only part of the database -->
+  <div class="card p-5" id="card-data-quality" data-export="dataquality" data-export-label="Data quality notes"></div>
 
   <!-- AI insights (Groq) -->
-  <div class="card p-5" id="card-insights"></div>
+  <div class="card p-5" id="card-insights" data-export="insights" data-export-label="AI insights"></div>
 
 </div>
 
+{% endblock %}
+{% block scripts %}
 <script src="/static/app.js"></script>
 <script>
   window.REPORT_ID = "{{ report_id }}";

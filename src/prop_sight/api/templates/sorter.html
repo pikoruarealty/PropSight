@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% set active_nav = 'sorter' %}
+{% block title %}Lead sorter — PropSight{% endblock %}
+{% block content %}
+
+<div class="mb-5">
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-[24px] font-bold text-on-surface">Lead sorter</h1>
+    <span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-label-xs">
+      rules apply to every dataset
+    </span>
+  </div>
+  <p class="text-body-sm text-on-surface-variant mt-1 max-w-3xl">
+    Classify leads as <b class="text-on-surface">Good</b> or <b class="text-on-surface">Bad</b> by the
+    values in any field — including fields recovered from the notes text. Rules run top to bottom and
+    the first match wins. A lead matched by no rule stays unclassified, and the sorter tells you why.
+  </p>
+</div>
+
+<div id="loading" class="text-body-sm flex items-center gap-2 text-on-surface-variant">
+  <span class="spinner"></span> Loading leads…
+</div>
+
+<div id="sorter" class="hidden flex flex-col gap-gutter">
+
+  <!-- Counts -->
+  <div id="class-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-gutter"></div>
+
+  <!-- Rules -->
+  <div class="card overflow-hidden">
+    <div class="p-4 border-b border-outline-variant bg-surface-container-low flex flex-wrap items-center gap-2">
+      <h2 class="text-headline-sm flex-1">Categorization rules</h2>
+      <button id="btn-import" class="btn-secondary h-8 px-3 flex items-center gap-1.5 text-label-xs">
+        <span class="material-symbols-outlined" style="font-size:16px;">upload</span> Import JSON
+      </button>
+      <button id="btn-export" class="btn-secondary h-8 px-3 flex items-center gap-1.5 text-label-xs">
+        <span class="material-symbols-outlined" style="font-size:16px;">download</span> Export JSON
+      </button>
+      <input type="file" id="import-input" accept=".json" class="hidden">
+    </div>
+
+    <div class="p-5">
+      <p class="text-body-sm text-on-surface-variant mb-4">
+        Conditions within a rule are combined with AND. Values shown are the cleaned
+        values the dashboard uses, so "Bungalow" also matches leads recorded as "Bungalow only".
+      </p>
+
+      <div id="rules-list" class="space-y-4"></div>
+
+      <div class="flex flex-wrap gap-2 mt-4">
+        <button id="btn-add-rule" class="btn-secondary h-9 px-3 flex items-center gap-1.5 text-body-sm">
+          <span class="material-symbols-outlined" style="font-size:18px;">add</span> Add rule
+        </button>
+        <button id="btn-save" class="btn-primary h-9 px-4 flex items-center gap-1.5 text-body-sm ml-auto">
+          <span class="material-symbols-outlined" style="font-size:16px;">save</span> Save &amp; apply
+        </button>
+      </div>
+      <div id="save-status" class="text-body-sm mt-3 hidden"></div>
+    </div>
+  </div>
+
+  <!-- Why leads were not classified -->
+  <div class="card p-5" id="card-unclassified"></div>
+
+  <!-- Export -->
+  <div class="card p-5">
+    <h2 class="text-headline-sm mb-1">Download</h2>
+    <p class="text-body-sm text-on-surface-variant mb-4 max-w-3xl">
+      Excel exports contain the columns you tick below, plus a <code class="px-1 rounded bg-surface-container">lead_class_reason</code>
+      column recording which rule decided each lead — or, for unclassified leads, which fields
+      were empty. The Meta CSV is built from canonical fields, so its names and phone numbers
+      are the cleaned ones.
+    </p>
+    <details class="mb-4">
+      <summary class="text-body-sm cursor-pointer text-on-surface-variant hover:text-on-surface">
+        Choose columns (<span id="col-count">0</span> selected)
+      </summary>
+      <div id="columns-grid" class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 max-h-52 overflow-y-auto pr-2"></div>
+      <div class="flex gap-3 mt-2">
+        <button id="btn-cols-all" class="text-label-xs text-primary hover:underline">select all</button>
+        <button id="btn-cols-none" class="text-label-xs text-primary hover:underline">select none</button>
+      </div>
+    </details>
+    <div id="download-buttons" class="flex flex-wrap gap-2"></div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/app.js"></script>
+<script src="/static/sorter.js"></script>
+<script>
+  window.REPORT_ID = "{{ report_id }}";
+  initSorter();
+</script>
+{% endblock %}

@@ -1,52 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Upload — PropSight{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-1">Upload lead workbooks</h1>
-<p class="text-sm mb-6" style="color: var(--ink-2);">
-  Upload one or more .xlsx exports. Each <b>sheet</b> is checked independently — property
-  type is detected from the sheet name or filename, and sheets that don't look like lead
-  data are excluded by default. You'll confirm or correct everything before the report is
-  built. All processing happens in memory; nothing is saved to disk.
-</p>
 
-<div id="dropzone" class="card p-10 text-center cursor-pointer border-2 border-dashed transition-colors"
-     style="border-color: var(--baseline);">
-  <div class="text-4xl mb-2">📊</div>
-  <p class="font-medium">Drop .xlsx files here or click to browse</p>
-  <p class="text-xs mt-1" style="color: var(--muted);">multiple files supported — different property types and/or export periods merge into one report</p>
+<div class="mb-6">
+  <h1 class="text-[24px] font-bold text-on-surface">Upload lead workbooks</h1>
+  <p class="text-body-sm text-on-surface-variant mt-1 max-w-3xl">
+    Upload one or more .xlsx or .csv exports. Each <b class="text-on-surface">sheet</b> is checked
+    independently — property type is detected from the sheet name or filename, and sheets that don't
+    look like lead data are excluded by default. You'll confirm or correct everything before the
+    dataset is built.
+  </p>
+</div>
+
+<div id="dropzone"
+     class="card p-12 text-center cursor-pointer border-2 border-dashed border-outline-variant hover:border-primary transition-colors">
+  <span class="material-symbols-outlined text-primary" style="font-size:40px;">cloud_upload</span>
+  <p class="text-body-md font-semibold mt-2">Drop files here, or click to browse</p>
+  <p class="text-body-sm text-on-surface-variant mt-1">
+    Multiple files supported — different property types and export periods merge into one dataset.
+  </p>
   <input type="file" id="file-input" accept=".xlsx,.csv" multiple class="hidden">
 </div>
 
-<div id="selected" class="mt-4 hidden">
-  <div class="card p-4">
-    <h2 class="font-medium text-sm mb-2">Selected files</h2>
-    <ul id="selected-list" class="text-sm space-y-1" style="color: var(--ink-2);"></ul>
-    <button id="upload-btn" class="mt-3 px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: var(--series-1);">
-      Parse workbooks
-    </button>
+<div id="selected" class="mt-5 hidden">
+  <div class="card overflow-hidden">
+    <div class="p-3 border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+      <h2 class="text-headline-sm text-[15px]">Selected files</h2>
+      <button id="upload-btn" class="btn-primary h-8 px-4 flex items-center gap-1.5 text-label-xs">
+        <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span> Parse workbooks
+      </button>
+    </div>
+    <ul id="selected-list" class="divide-y divide-outline-variant text-body-sm"></ul>
   </div>
 </div>
 
-<div id="upload-status" class="mt-4 text-sm hidden"></div>
+<div id="upload-status" class="mt-4 text-body-sm hidden">
+  <div class="flex items-center gap-2">
+    <span class="spinner"></span>
+    <span id="upload-status-text"></span>
+  </div>
+</div>
 
 <!-- Step 2: confirm property types (inline, no re-upload) -->
 <div id="confirm-step" class="mt-6 hidden">
   <div class="card p-5">
-    <h2 class="text-lg font-semibold mb-1">Confirm sheets &amp; property types</h2>
-    <p class="text-sm mb-4" style="color: var(--ink-2);">
+    <h2 class="text-headline-sm mb-1">Confirm sheets &amp; property types</h2>
+    <p class="text-body-sm text-on-surface-variant mb-4 max-w-3xl">
       Each sheet in every workbook is checked independently — a workbook can mix real lead
       sheets with unrelated ones. Sheets that don't look like lead data are unchecked by
-      default; review before building the report. Every <b>included</b> sheet needs a
-      property type.
+      default; review before building. Every <b class="text-on-surface">included</b> sheet needs
+      a property type.
     </p>
     <div id="confirm-groups"></div>
-    <div id="confirm-error" class="mt-3 text-sm hidden" style="color: var(--critical);"></div>
-    <button id="confirm-btn" class="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: var(--series-1);">
-      Build report
+    <div id="confirm-error" class="mt-3 text-body-sm text-error hidden"></div>
+    <button id="confirm-btn" class="btn-primary mt-4 h-9 px-4 flex items-center gap-1.5 text-body-sm">
+      <span class="material-symbols-outlined" style="font-size:16px;">check</span> Build dataset
     </button>
   </div>
 </div>
 
+{% endblock %}
+{% block scripts %}
 <script src="/static/app.js"></script>
 <script>
 const dropzone = document.getElementById('dropzone');
@@ -55,18 +69,19 @@ let pendingFiles = [];
 let draft = null;
 
 dropzone.addEventListener('click', () => fileInput.click());
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.borderColor = 'var(--series-1)'; });
-dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = 'var(--baseline)'; });
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('border-primary'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-primary'));
 dropzone.addEventListener('drop', e => {
   e.preventDefault();
-  dropzone.style.borderColor = 'var(--baseline)';
+  dropzone.classList.remove('border-primary');
   addFiles(e.dataTransfer.files);
 });
 fileInput.addEventListener('change', () => addFiles(fileInput.files));
 
 function addFiles(list) {
   for (const f of list) {
-    if (f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.csv')) pendingFiles.push(f);
+    const name = f.name.toLowerCase();
+    if (name.endsWith('.xlsx') || name.endsWith('.csv')) pendingFiles.push(f);
   }
   renderSelected();
 }
@@ -76,20 +91,44 @@ function renderSelected() {
   const ul = document.getElementById('selected-list');
   if (!pendingFiles.length) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
-  ul.innerHTML = pendingFiles.map((f, i) =>
-    `<li>📄 ${esc(f.name)} <span style="color: var(--muted);">(${(f.size/1024).toFixed(0)} KB)</span>
-      <button data-i="${i}" class="remove-file ml-2 text-xs" style="color: var(--critical);">remove</button></li>`
-  ).join('');
+  ul.innerHTML = pendingFiles.map((f, i) => `
+    <li class="flex items-center gap-3 px-3 py-2.5">
+      <span class="material-symbols-outlined text-on-surface-variant" style="font-size:18px;">description</span>
+      <span class="flex-1 min-w-0 truncate">${esc(f.name)}</span>
+      <span class="tabular-nums text-on-surface-variant">${(f.size / 1024).toFixed(0)} KB</span>
+      <button data-i="${i}" class="remove-file w-7 h-7 grid place-items-center rounded text-outline hover:text-error transition-colors" aria-label="Remove">
+        <span class="material-symbols-outlined" style="font-size:18px;">close</span>
+      </button>
+    </li>`).join('');
   ul.querySelectorAll('.remove-file').forEach(btn =>
     btn.addEventListener('click', () => { pendingFiles.splice(+btn.dataset.i, 1); renderSelected(); }));
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function pollUploadProgress(progressId, statusText) {
+  // Polled, not pushed: a plain request/poll loop needs no websocket plumbing
+  // and degrades safely if a poll is dropped — the next one just catches up.
+  while (true) {
+    const res = await fetch(`/upload/status/${progressId}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Server error: ${res.status} ${res.statusText}`);
+    }
+    const progress = await res.json();
+    if (progress.stage) statusText.textContent = progress.stage;
+    if (progress.done) return progress.result;
+    await sleep(700);
+  }
 }
 
 document.getElementById('upload-btn').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   const status = document.getElementById('upload-status');
+  const statusText = document.getElementById('upload-status-text');
   status.classList.remove('hidden');
-  status.textContent = 'Parsing workbooks…';
-  status.style.color = '';
+  statusText.textContent = 'Starting…';
+  statusText.classList.remove('text-error');
   const form = new FormData();
   pendingFiles.forEach(f => form.append('files', f));
   await withBtnLoading(btn, 'Parsing…', async () => {
@@ -99,12 +138,13 @@ document.getElementById('upload-btn').addEventListener('click', async (e) => {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || `Server error: ${res.status} ${res.statusText}`);
       }
-      draft = await res.json();
+      const { progress_id } = await res.json();
+      draft = await pollUploadProgress(progress_id, statusText);
       status.classList.add('hidden');
       renderConfirm();
     } catch (err) {
-      status.textContent = '⚠ ' + err.message;
-      status.style.color = 'var(--critical)';
+      statusText.textContent = '⚠ ' + err.message;
+      statusText.classList.add('text-error');
     }
   });
 });
@@ -120,35 +160,37 @@ function renderConfirm() {
           `<option value="${esc(t)}" ${s.detected_type === t ? 'selected' : ''}>${esc(t)}</option>`))
         .join('');
       const badge = s.looks_like_lead_sheet
-        ? `<span class="text-xs" style="color: var(--good);">looks like lead data</span>`
-        : `<span class="text-xs" style="color: var(--muted);">doesn't look like lead data</span>`;
+        ? `<span class="px-2 py-0.5 rounded-full text-label-xs" style="background: rgb(var(--success) / 0.15); color: rgb(var(--success));">Lead data</span>`
+        : `<span class="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant text-label-xs">Unrecognized</span>`;
       const typeBadge = s.detected_type
         ? ''
-        : `<span class="text-xs ml-2" style="color: var(--serious);">not detected</span>`;
-      return `<tr class="border-t" style="border-color: var(--grid);">
-        <td class="py-2 pr-2"><input type="checkbox" class="sheet-include" data-index="${s.sheet_index}" ${s.include ? 'checked' : ''}></td>
+        : `<span class="text-label-xs ml-2 text-tertiary">not detected</span>`;
+      return `<tr class="border-t border-outline-variant">
+        <td class="py-2 pr-2"><input type="checkbox" class="sheet-include rounded border-outline-variant text-primary" data-index="${s.sheet_index}" ${s.include ? 'checked' : ''}></td>
         <td class="py-2 pr-4">${esc(s.sheet_name)}</td>
-        <td class="py-2 pr-4">${s.row_count}</td>
+        <td class="py-2 pr-4 tabular-nums text-on-surface-variant">${s.row_count}</td>
         <td class="py-2 pr-4">${badge}</td>
         <td class="py-2">
-          <select data-index="${s.sheet_index}" class="type-select border rounded px-2 py-1 text-sm" style="border-color: var(--baseline); background: var(--surface-1);">${opts}</select>
+          <select data-index="${s.sheet_index}" class="type-select h-8 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface px-2 text-body-sm">${opts}</select>
           ${typeBadge}
         </td>
       </tr>`;
     }).join('');
-    return `<details class="mt-4 first:mt-0 card" open>
-      <summary class="text-sm font-medium p-3 cursor-pointer select-none border-b bg-gray-50 rounded-t-lg" style="border-color: var(--grid);">
-        📄 ${esc(f.filename)} <span style="color: var(--muted);">(${f.sheet_count} sheets, ${f.row_count} rows)</span>
+    return `<details class="mt-4 first:mt-0 rounded-xl border border-outline-variant overflow-hidden" open>
+      <summary class="text-body-sm font-semibold p-3 cursor-pointer select-none bg-surface-container-low flex items-center gap-2">
+        <span class="material-symbols-outlined text-on-surface-variant" style="font-size:18px;">description</span>
+        ${esc(f.filename)}
+        <span class="text-on-surface-variant font-normal">(${f.sheet_count} sheets, ${f.row_count} rows)</span>
       </summary>
-      <div class="p-3 overflow-x-auto">
-        <table class="w-full text-sm min-w-[500px]">
+      <div class="p-3 overflow-x-auto bg-surface-container-lowest">
+        <table class="w-full text-body-sm min-w-[560px]">
           <thead>
-            <tr class="text-left" style="color: var(--muted);">
-              <th class="py-1 pr-2 font-medium">Include</th>
-              <th class="py-1 pr-4 font-medium">Sheet</th>
-              <th class="py-1 pr-4 font-medium">Rows</th>
-              <th class="py-1 pr-4 font-medium">Looks like</th>
-              <th class="py-1 font-medium">Property type</th>
+            <tr class="text-left text-on-surface-variant text-label-xs uppercase">
+              <th class="py-1 pr-2 font-semibold">Include</th>
+              <th class="py-1 pr-4 font-semibold">Sheet</th>
+              <th class="py-1 pr-4 font-semibold">Rows</th>
+              <th class="py-1 pr-4 font-semibold">Looks like</th>
+              <th class="py-1 font-semibold">Property type</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -179,11 +221,11 @@ document.getElementById('confirm-btn').addEventListener('click', async (e) => {
     sheets[index] = { include, property_type: sel.value || '' };
   });
   if (missing) {
-    errBox.textContent = 'Every included sheet needs a property type before the report can be built.';
+    errBox.textContent = 'Every included sheet needs a property type before the dataset can be built.';
     errBox.classList.remove('hidden');
     return;
   }
-  await withBtnLoading(btn, 'Building report…', async () => {
+  await withBtnLoading(btn, 'Building…', async () => {
     try {
       const res = await fetch(`/reports/${draft.report_id}/confirm`, {
         method: 'PATCH',

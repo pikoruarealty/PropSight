@@ -3,7 +3,11 @@ uvicorn[standard]
 jinja2
 python-multipart
 pandas
+pyarrow
 openpyxl
 python-dotenv
 requests
 pytest
+pymongo
+PyJWT
+bcrypt

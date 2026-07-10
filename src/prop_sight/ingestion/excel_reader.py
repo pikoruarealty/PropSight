@@ -6,12 +6,16 @@ import io
 
 import pandas as pd
 
+from .mojibake import repair_frame, repair_mojibake
+
 
 def read_workbook(contents: bytes, filename: str) -> dict[str, pd.DataFrame]:
     """Read every sheet of a workbook from raw bytes (supports .xlsx and .csv).
 
     Returns {sheet_name: DataFrame}. Rows that are entirely empty are dropped;
-    sheets left with zero rows are removed.
+    sheets left with zero rows are removed. Text mangled by an upstream
+    encoding round trip (the Privyr export does this to every non-ASCII
+    character) is repaired here, so nothing downstream ever sees it.
     """
     if filename.lower().endswith(".csv"):
         try:
@@ -31,5 +35,5 @@ def read_workbook(contents: bytes, filename: str) -> dict[str, pd.DataFrame]:
     for name, df in sheets.items():
         df = df.dropna(how="all")
         if not df.empty:
-            cleaned[name] = df.reset_index(drop=True)
+            cleaned[repair_mojibake(name)] = repair_frame(df.reset_index(drop=True))
     return cleaned

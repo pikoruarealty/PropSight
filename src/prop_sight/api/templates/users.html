@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Users — PropSight{% endblock %}
+{% block content %}
+
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
+  <div>
+    <h1 class="text-[24px] font-bold text-on-surface">Users</h1>
+    <p class="text-body-sm text-on-surface-variant mt-1">
+      Everyone here can see every dataset. Administrators can additionally manage accounts.
+    </p>
+  </div>
+  <button id="btn-new-user" class="btn-primary h-8 px-4 flex items-center gap-1.5 text-label-xs">
+    <span class="material-symbols-outlined" style="font-size:16px;">person_add</span> Add user
+  </button>
+</div>
+
+{% if pending %}
+<div class="card p-4 mb-5 border-tertiary/40 bg-tertiary/5">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="material-symbols-outlined text-tertiary" style="font-size:18px;">hourglass_top</span>
+    <h2 class="text-body-md font-semibold text-on-surface">Awaiting approval ({{ pending | length }})</h2>
+  </div>
+  <div class="space-y-2">
+    {% for u in pending %}
+    <div id="pending-{{ u._id }}" class="flex items-center justify-between gap-3 rounded-lg bg-surface-container-lowest border border-outline-variant px-3 py-2">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 rounded-full bg-tertiary/20 text-tertiary grid place-items-center text-[10px] font-semibold">{{ u.username[0] | upper }}</span>
+        <span class="text-body-sm font-medium text-on-surface">{{ u.username }}</span>
+        <span class="text-label-xs text-on-surface-variant">registered {{ u.created_at.strftime('%d %b %Y') if u.created_at else '' }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="approve-user h-7 px-3 rounded-lg bg-success text-white hover:opacity-90 text-label-xs font-semibold"
+                data-id="{{ u._id }}">Approve</button>
+        <button class="del-user h-7 px-3 rounded-lg border border-error/40 text-error hover:bg-error-container/30 text-label-xs"
+                data-id="{{ u._id }}" data-name="{{ u.username }}">Reject</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div id="new-user-form" class="card p-4 mb-5 hidden">
+  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+    <label class="block">
+      <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Username</span>
+      <input id="nu-username" class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-sm">
+    </label>
+    <label class="block">
+      <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Password</span>
+      <input id="nu-password" type="password" class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-sm">
+    </label>
+    <label class="block">
+      <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Role</span>
+      <select id="nu-role" class="mt-1 w-full h-9 px-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-sm">
+        <option value="user">User</option>
+        <option value="admin">Administrator</option>
+      </select>
+    </label>
+    <button id="nu-submit" class="btn-primary h-9 px-4 text-body-sm">Create</button>
+  </div>
+  <p id="nu-error" class="text-body-sm text-error mt-2 hidden"></p>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left whitespace-nowrap">
+      <thead>
+        <tr class="bg-surface-container-low border-b border-outline-variant text-on-surface-variant text-label-xs uppercase">
+          <th class="p-3 font-semibold">Username</th>
+          <th class="p-3 font-semibold">Role</th>
+          <th class="p-3 font-semibold">Created</th>
+          <th class="p-3 font-semibold text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant text-body-sm">
+        {% for u in users %}
+        {% if u.status != 'pending' %}
+        <tr id="user-{{ u._id }}" class="hover:bg-surface-container-low transition-colors">
+          <td class="p-3 font-semibold flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-primary text-on-primary grid place-items-center text-[10px] font-semibold">{{ u.username[0] | upper }}</span>
+            {{ u.username }}
+          </td>
+          <td class="p-3">
+            {% if u.role == 'admin' %}
+            <span class="px-2 py-0.5 rounded-full bg-primary/15 text-primary text-label-xs">Administrator</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-label-xs">User</span>
+            {% endif %}
+          </td>
+          <td class="p-3 tabular-nums text-on-surface-variant">{{ u.created_at.strftime('%d %b %Y') if u.created_at else '—' }}</td>
+          <td class="p-3 text-right">
+            {% if u._id != user._id %}
+            <button class="del-user h-7 px-3 rounded-lg border border-error/40 text-error hover:bg-error-container/30 text-label-xs"
+                    data-id="{{ u._id }}" data-name="{{ u.username }}">Remove</button>
+            {% else %}
+            <span class="text-label-xs text-on-surface-variant">You</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/app.js"></script>
+<script>
+const form = document.getElementById('new-user-form');
+const err  = document.getElementById('nu-error');
+
+document.getElementById('btn-new-user').addEventListener('click', () => {
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden')) document.getElementById('nu-username').focus();
+});
+
+function showError(message) {
+  err.textContent = message;
+  err.classList.remove('hidden');
+}
+
+document.getElementById('nu-submit').addEventListener('click', async (e) => {
+  err.classList.add('hidden');
+  await withBtnLoading(e.currentTarget, 'Creating…', async () => {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('nu-username').value,
+        password: document.getElementById('nu-password').value,
+        role: document.getElementById('nu-role').value,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showError(data.detail || `Server error: ${res.status}`);
+      return;
+    }
+    window.location.reload();
+  });
+});
+
+document.querySelectorAll('.approve-user').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    await withBtnLoading(btn, 'Approving…', async () => {
+      const res = await fetch(`/api/users/${btn.dataset.id}/approve`, { method: 'POST' });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.detail || 'Could not approve that user.');
+      }
+    });
+  });
+});
+
+document.querySelectorAll('.del-user').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm(`Remove ${btn.dataset.name}? They lose access immediately.`)) return;
+    await withBtnLoading(btn, 'Removing…', async () => {
+      const res = await fetch(`/api/users/${btn.dataset.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        document.getElementById(`user-${btn.dataset.id}`).remove();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.detail || 'Could not remove that user.');
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

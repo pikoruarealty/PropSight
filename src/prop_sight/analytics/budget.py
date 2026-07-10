@@ -32,6 +32,12 @@ _NUM_UNIT = re.compile(
     r"(\d+(?:[.,]\d+)?)\s*(cr|crore|crores|c|l|lac|lacs|lakh|lakhs|k)?", re.IGNORECASE
 )
 
+# No individual homebuyer lead in this market is shopping above this. Above it,
+# the "Cr"/"L" the row typed is almost certainly a typo or a unit mismatch, and
+# a wrong number that big would swamp every average, max, and Meta export value
+# it touches — so it is treated as unparseable rather than taken at face value.
+_MAX_PLAUSIBLE_LAKH = 5000.0
+
 
 def _to_lakh(num: float, unit: str | None) -> float:
     unit = (unit or "").lower()
@@ -68,7 +74,10 @@ def parse_budget(text: object) -> float | None:
             continue
         if num <= 0:
             continue
-        values.append(_to_lakh(num, unit or None))
+        lakh = _to_lakh(num, unit or None)
+        if lakh > _MAX_PLAUSIBLE_LAKH:
+            continue
+        values.append(lakh)
     if not values:
         return None
     return round((min(values) + max(values)) / 2, 2)

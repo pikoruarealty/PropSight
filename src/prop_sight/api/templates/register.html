@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Create account — PropSight{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+  <div class="w-full max-w-sm">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <div class="text-2xl font-bold text-primary">PropSight</div>
+        <p class="text-body-sm text-on-surface-variant mt-1">Lead intelligence, signed in.</p>
+      </div>
+      <button id="theme-toggle" type="button" aria-label="Toggle dark mode"
+              class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+        <span class="material-symbols-outlined hidden dark:inline" style="font-size:20px;">light_mode</span>
+        <span class="material-symbols-outlined inline dark:hidden" style="font-size:20px;">dark_mode</span>
+      </button>
+    </div>
+
+    {% if pending %}
+    <div class="card p-6 space-y-4 text-center">
+      <span class="material-symbols-outlined text-primary" style="font-size:36px;">mark_email_read</span>
+      <h1 class="text-headline-sm">Account created</h1>
+      <p class="text-body-sm text-on-surface-variant">
+        An administrator needs to approve your account before you can sign in.
+        You'll be able to log in as soon as that happens.
+      </p>
+      <a href="/login" class="btn-primary w-full h-9 text-body-sm inline-flex items-center justify-center">Back to sign in</a>
+    </div>
+    {% else %}
+    <form method="post" action="/register" class="card p-6 space-y-4">
+      <h1 class="text-headline-sm">Create an account</h1>
+
+      {% if error %}
+      <div class="flex items-start gap-2 rounded-lg px-3 py-2 bg-error-container text-on-error-container text-body-sm">
+        <span class="material-symbols-outlined shrink-0" style="font-size:18px;">error</span>
+        <span>{{ error }}</span>
+      </div>
+      {% endif %}
+
+      <p class="text-body-sm text-on-surface-variant -mt-2">
+        New accounts need administrator approval before you can sign in.
+      </p>
+
+      <label class="block">
+        <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Username</span>
+        <input name="username" required autofocus autocomplete="username" value="{{ username | default('', true) }}"
+               class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm">
+        <span class="text-label-xs text-on-surface-variant">3–32 characters: letters, digits, dot, dash, underscore.</span>
+      </label>
+
+      <label class="block">
+        <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Password</span>
+        <input name="password" type="password" required minlength="8" autocomplete="new-password"
+               class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm">
+        <span class="text-label-xs text-on-surface-variant">At least 8 characters.</span>
+      </label>
+
+      <label class="block">
+        <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Confirm password</span>
+        <input name="confirm_password" type="password" required minlength="8" autocomplete="new-password"
+               class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm">
+      </label>
+
+      <button type="submit" class="btn-primary w-full h-9 text-body-sm">Create account</button>
+
+      <p class="text-body-sm text-on-surface-variant text-center pt-1">
+        Already registered? <a href="/login" class="text-primary hover:underline font-semibold">Sign in</a>
+      </p>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

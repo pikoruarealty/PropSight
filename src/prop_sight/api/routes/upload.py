@@ -13,6 +13,13 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_workbooks(files: list[UploadFile]):
+    """Start parsing in the background and hand back a ticket to poll.
+
+    Parsing can take a while (a workbook read per file, an LLM round-trip per
+    sheet the alias table doesn't recognize), and used to be one opaque
+    blocking request — indistinguishable from a hang. The upload page now
+    polls `/upload/status/{progress_id}` and shows what is actually happening.
+    """
     if not files:
         raise HTTPException(400, "No files uploaded.")
     if len(files) > MAX_FILES_PER_UPLOAD:
@@ -28,10 +35,18 @@ async def upload_workbooks(files: list[UploadFile]):
         if len(contents) > MAX_UPLOAD_BYTES:
             raise HTTPException(400, f"'{name}' exceeds the {MAX_UPLOAD_BYTES // (1024*1024)} MB limit.")
         payload.append((name, contents))
-    try:
-        return ingest_service.create_draft(payload)
-    except Exception as exc:
-        raise HTTPException(422, f"Could not parse workbook: {exc}")
+    progress_id = ingest_service.start_draft(payload)
+    return {"progress_id": progress_id}
+
+
+@router.get("/upload/status/{progress_id}")
+def upload_status(progress_id: str):
+    progress = ingest_service.get_progress(progress_id)
+    if progress is None:
+        raise HTTPException(404, "Unknown upload ticket — the server may have restarted.")
+    if progress.get("error"):
+        raise HTTPException(422, f"Could not parse workbook: {progress['error']}")
+    return progress
 
 
 class SheetChoice(BaseModel):

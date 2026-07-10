@@ -4,31 +4,211 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}PropSight{% endblock %}</title>
+
+  <!-- Applied before first paint: reading the stored theme after the stylesheet
+       lands would flash a white page at every dark-mode user on every load. -->
+  <script>
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem('propsight-theme'); } catch (e) {}
+      var dark = stored ? stored === 'dark'
+                        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', dark);
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    /* Colours are CSS variables holding "R G B" triplets rather than hex, so a
+       single Tailwind config serves both themes and `bg-primary/10` still works. */
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: Object.fromEntries([
+            'primary', 'on-primary', 'primary-container', 'on-primary-container',
+            'primary-fixed', 'on-primary-fixed-variant',
+            'secondary', 'on-secondary', 'secondary-container', 'on-secondary-container',
+            'tertiary', 'on-tertiary', 'tertiary-container',
+            'error', 'on-error', 'error-container', 'on-error-container',
+            'success', 'background', 'surface', 'surface-bright', 'surface-variant',
+            'surface-container-lowest', 'surface-container-low', 'surface-container',
+            'surface-container-high', 'surface-container-highest',
+            'on-surface', 'on-surface-variant', 'outline', 'outline-variant',
+          ].map(n => [n, `rgb(var(--${n}) / <alpha-value>)`])),
+          maxWidth: { 'container-max': '1440px' },
+          spacing: { gutter: '12px', 'margin-mobile': '16px', 'margin-desktop': '24px' },
+          borderRadius: { DEFAULT: '0.25rem', lg: '0.5rem', xl: '0.75rem' },
+          fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
+          fontSize: {
+            'headline-sm': ['18px', { lineHeight: '24px', letterSpacing: '-0.01em', fontWeight: '600' }],
+            'body-md': ['14px', { lineHeight: '20px' }],
+            'body-sm': ['13px', { lineHeight: '18px' }],
+            'label-xs': ['11px', { lineHeight: '16px', letterSpacing: '0.02em', fontWeight: '600' }],
+            'data-tabular': ['13px', { lineHeight: '18px' }],
+          },
+        },
+      },
+    };
+  </script>
   <style>
     :root {
-      --surface-1: #fcfcfb;
-      --page: #f9f9f7;
-      --ink: #0b0b0b;
-      --ink-2: #52514e;
-      --muted: #898781;
-      --grid: #e1e0d9;
-      --baseline: #c3c2b7;
-      --border: rgba(11,11,11,0.10);
-      --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100;
-      --series-4: #008300; --series-5: #4a3aa7; --series-6: #e34948;
-      --series-7: #e87ba4; --series-8: #eb6834;
-      --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+      --primary: 0 91 176;              --on-primary: 255 255 255;
+      --primary-container: 36 116 210;  --on-primary-container: 254 252 255;
+      --primary-fixed: 213 227 255;     --on-primary-fixed-variant: 0 70 138;
+      --secondary: 101 93 87;           --on-secondary: 255 255 255;
+      --secondary-container: 233 222 214; --on-secondary-container: 105 97 91;
+      --tertiary: 145 72 0;             --on-tertiary: 255 255 255;
+      --tertiary-container: 182 92 0;
+      --error: 186 26 26;               --on-error: 255 255 255;
+      --error-container: 255 218 214;   --on-error-container: 147 0 10;
+      --success: 11 138 0;
+      --background: 252 249 246;        --surface: 252 249 246;
+      --surface-bright: 252 249 246;    --surface-variant: 229 226 224;
+      --surface-container-lowest: 255 255 255;
+      --surface-container-low: 246 243 241;
+      --surface-container: 240 237 235;
+      --surface-container-high: 235 232 229;
+      --surface-container-highest: 229 226 224;
+      --on-surface: 28 28 27;           --on-surface-variant: 65 71 82;
+      --outline: 114 119 132;           --outline-variant: 193 198 212;
+
+      /* Chart series. Fixed slots — never cycled, never assigned by rank. */
+      --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100; --series-4: #008300;
+      --series-5: #4a3aa7; --series-6: #e34948; --series-7: #e87ba4; --series-8: #eb6834;
+      --blue-ramp: #cde2fb,#b7d3f6,#9ec5f4,#86b6ef,#6da7ec,#5598e7,#3987e5,#2a78d6,#256abf,#1c5cab,#184f95;
     }
-    body { background: var(--page); color: var(--ink); font-family: "Inter", system-ui, -apple-system, sans-serif; }
-    .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 0.75rem; }
+
+    html.dark {
+      --primary: 168 200 255;           --on-primary: 0 48 98;
+      --primary-container: 75 145 241;  --on-primary-container: 0 41 86;
+      --primary-fixed: 0 70 138;        --on-primary-fixed-variant: 213 227 255;
+      --secondary: 200 198 197;         --on-secondary: 48 48 48;
+      --secondary-container: 71 71 70;  --on-secondary-container: 183 181 180;
+      --tertiary: 255 183 132;          --on-tertiary: 79 37 0;
+      --tertiary-container: 218 119 32;
+      --error: 255 180 171;             --on-error: 105 0 5;
+      --error-container: 147 0 10;      --on-error-container: 255 218 214;
+      --success: 74 222 128;
+      --background: 19 19 19;           --surface: 19 19 19;
+      --surface-bright: 58 57 57;       --surface-variant: 53 53 52;
+      --surface-container-lowest: 14 14 14;
+      --surface-container-low: 28 27 27;
+      --surface-container: 32 31 31;
+      --surface-container-high: 42 42 42;
+      --surface-container-highest: 53 53 52;
+      --on-surface: 229 226 225;        --on-surface-variant: 193 198 212;
+      --outline: 139 145 158;           --outline-variant: 65 71 82;
+
+      /* Lifted and desaturated so the series glow against near-black rather
+         than vibrate against it. */
+      --series-1: #8ab4f8; --series-2: #4ade80; --series-3: #fbbf24; --series-4: #34d399;
+      --series-5: #a78bfa; --series-6: #f87171; --series-7: #f0abfc; --series-8: #fb923c;
+      --blue-ramp: #17304f,#1c3c63,#204877,#25548b,#2a60a0,#3b74b6,#5289cb,#6a9ede,#86b4ec,#a3c9f5,#c3ddff;
+    }
+
+    /* Aliases for the pre-existing chart/table CSS in app.js and sorter.js.
+       Mapping them onto the design tokens is what lets those files stay as they
+       are and still follow the theme. */
+    :root, html.dark {
+      --surface-1: rgb(var(--surface-container-lowest));
+      --page:      rgb(var(--background));
+      --ink:       rgb(var(--on-surface));
+      --ink-2:     rgb(var(--on-surface-variant));
+      --muted:     rgb(var(--outline));
+      --grid:      rgb(var(--outline-variant));
+      --baseline:  rgb(var(--outline));
+      --border:    rgb(var(--outline-variant));
+      --good:      rgb(var(--success));
+      --warning:   rgb(var(--tertiary));
+      --serious:   rgb(var(--tertiary));
+      --critical:  rgb(var(--error));
+    }
+
+    /* Without this, native widgets — checkbox ticks, the <select> dropdown
+       popup, scrollbars — always render with light-OS chrome, so a dark-themed
+       select showed dark text (from our CSS) inside a white popup (from the
+       OS) in dark mode. */
+    :root { color-scheme: light; }
+    html.dark { color-scheme: dark; }
+
+    body {
+      background: rgb(var(--background));
+      color: rgb(var(--on-surface));
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      user-select: none;
+    }
+    .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+
+    /* Depth is outline, not shadow. min-width:0 — a grid/flex item defaults to
+       min-width:auto, so one long unbreakable campaign name stretches its card
+       past the viewport and the whole page scrolls sideways on mobile. */
+    .card {
+      background: rgb(var(--surface-container-lowest));
+      border: 1px solid rgb(var(--outline-variant));
+      border-radius: 0.75rem;
+      min-width: 0;
+    }
+    .btn-primary {
+      background: rgb(var(--primary)); color: rgb(var(--on-primary));
+      border-radius: 0.5rem; font-weight: 600;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: rgb(var(--surface-container-lowest)); color: rgb(var(--on-surface));
+      border: 1px solid rgb(var(--outline-variant)); border-radius: 0.5rem;
+    }
+    .btn-secondary:hover { background: rgb(var(--surface-variant)); }
+
+    input, select, textarea { font-family: inherit; }
+    /* Native <option> popups inherit the parent <select>'s text colour by
+       default — the rule-category pill sets text-success/text-error on the
+       select itself for its own display, and without this every option in the
+       dropdown (not just the selected one) rendered in that colour too. */
+    .rule-cat option { color: rgb(var(--on-surface)); background: rgb(var(--surface-container-lowest)); font-weight: 600; }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: rgb(var(--primary));
+      box-shadow: 0 0 0 2px rgb(var(--primary) / 0.2);
+    }
+
     .bar-track { background: transparent; }
     .bar-fill { border-radius: 0 4px 4px 0; height: 14px; min-width: 2px; }
-    .tab-active { background: var(--ink); color: #fff; }
-    table.matrix td, table.matrix th { border: 1px solid var(--grid); padding: 6px 12px; font-variant-numeric: tabular-nums; }
+    .tab-active { background: rgb(var(--primary)); color: rgb(var(--on-primary)); }
+    table.matrix td, table.matrix th {
+      border: 1px solid rgb(var(--outline-variant)); padding: 6px 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+
+    /* Plain-English caption above each cross-tab. */
+    .chart-summary { color: rgb(var(--on-surface-variant)); line-height: 1.5; }
+    /* A crosstab drawn from under a quarter of the leads must announce it. */
+    .coverage-warn { color: rgb(var(--tertiary)) !important; }
+
+    /* Heatmap: 2px surface gap between cells, per the mark spec. */
+    table.heatmap { border-collapse: separate; border-spacing: 2px; }
+    table.heatmap .hm-cell { width: 22px; height: 20px; border-radius: 2px; }
+    table.heatmap .hm-row { font-size: 11px; color: rgb(var(--on-surface-variant)); text-align: right; padding-right: 6px; font-weight: 500; }
+    table.heatmap .hm-h { font-size: 10px; color: rgb(var(--outline)); font-weight: 400; }
+
+    /* Inline highlights inside AI insight text. */
+    .hl { padding: 1px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .hl-config { background: #cde2fb; color: #104281; }
+    .hl-money  { background: #c9efdf; color: #0b5a3d; }
+    .hl-pct    { background: #ded9f5; color: #2b2166; }
+    html.dark .hl-config { background: #1e3a5f; color: #a8c8ff; }
+    html.dark .hl-money  { background: #10402e; color: #6ee7b7; }
+    html.dark .hl-pct    { background: #2f2a52; color: #c4b5fd; }
+
     .spinner {
       display: inline-block; width: 1em; height: 1em; border-radius: 50%;
       border: 2px solid currentColor; border-right-color: transparent;
@@ -37,35 +217,163 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     [data-loading="true"] { opacity: 0.7; pointer-events: none; }
     .skeleton {
-      background: linear-gradient(90deg, var(--grid) 25%, var(--baseline) 37%, var(--grid) 63%);
+      background: linear-gradient(90deg, rgb(var(--surface-container)) 25%, rgb(var(--surface-variant)) 37%, rgb(var(--surface-container)) 63%);
       background-size: 400% 100%; animation: skeleton-shimmer 1.4s ease infinite;
       border-radius: 0.5rem;
     }
     @keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+    /* Chart.js external tooltip (see externalTooltip() in app.js) — a real DOM
+       element so long text can wrap instead of being clipped at the edge of a
+       small canvas. Positioned via `transform` in JS; opacity/visibility here
+       so it starts hidden without a flash at (0,0) on first paint. */
+    #chartjs-tooltip {
+      position: fixed; top: 0; left: 0; opacity: 0; pointer-events: none;
+      z-index: 1000; transition: opacity .1s ease;
+      background: rgba(28, 28, 27, 0.95); color: #fff;
+      padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5;
+      max-width: 240px; white-space: normal; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    }
+    .chartjs-tooltip-title { font-weight: 600; margin-bottom: 2px; }
+    .chartjs-tooltip-row { display: flex; align-items: flex-start; gap: 6px; }
+    .chartjs-tooltip-swatch {
+      width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; margin-top: 3px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background-color: rgb(var(--outline-variant)); border-radius: 3px; }
+
     @media print {
+      /* Without this, the browser's default "economy" print mode strips
+         background colours to save ink — invisible on a physical printer, but
+         it also silently deletes every legend swatch and heatmap cell in a
+         PDF export, which is the whole point of the colours in the first
+         place. Forced globally rather than per-class since new chart types
+         keep adding their own colour chips. */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      /* Surfaces/text are read from these tokens everywhere (.card, body, tables,
+         heatmap cells...). Forcing white/black page is the point of print mode, but
+         `body{background:white}` alone doesn't reach .card etc — they still resolve
+         --surface-container-lowest, which is near-black in dark mode. Pinning the
+         tokens themselves for the duration of print is the only override that reaches
+         every consumer at once. */
+      /* Chrome paints the page's default canvas (margins, any gap nothing else
+         explicitly colours) from `color-scheme`, not from these tokens — leaving
+         html.dark's `color-scheme: dark` active here painted that canvas black
+         even after every element's own background was pinned to white above. */
+      html.dark { color-scheme: light !important; }
+      :root, html.dark {
+        --background: 255 255 255 !important;      --surface: 255 255 255 !important;
+        --surface-bright: 255 255 255 !important;   --surface-variant: 229 226 224 !important;
+        --surface-container-lowest: 255 255 255 !important;
+        --surface-container-low: 246 243 241 !important;
+        --surface-container: 240 237 235 !important;
+        --surface-container-high: 235 232 229 !important;
+        --surface-container-highest: 229 226 224 !important;
+        --on-surface: 0 0 0 !important;             --on-surface-variant: 65 71 82 !important;
+        --outline: 114 119 132 !important;           --outline-variant: 193 198 212 !important;
+      }
       body { background: white; color: black; font-size: 12pt; }
-      nav, .hide-on-print, #focus-chips, #type-tabs, #file-tabs, #report-files { display: none !important; }
-      .card { border: none !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 24px; padding: 0 !important; }
+      header, .hide-on-print, #focus-chips, #type-tabs, #file-tabs, #report-files, #dedupe-banner { display: none !important; }
+      /* Toggled at export time by the PDF-config popup (see loadPdfConfig() in app.js). */
+      [data-export].export-hide { display: none !important; }
+      .card { border: none !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 14px; padding: 0 !important; }
       main { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
       canvas { max-width: 100% !important; }
-      .bar-track { background: var(--grid); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .bar-track { background: #e1e0d9; }
+      /* CSS Grid paginates badly under print: a row whose item doesn't fit the
+         remaining page height gets pushed whole to the next page, leaving the
+         rest of the current page blank. Stacking single-column avoids that for
+         the tall chart-card rows — but #hero-tiles' four short KPI tiles never
+         hit that problem, so forcing them to block too just wastes vertical
+         space that the 4-column grid was using fine; keep that one as a grid. */
+      .grid:not(#hero-tiles) { display: block !important; }
+      .grid:not(#hero-tiles) > * { margin-bottom: 14px; }
+      #hero-tiles { gap: 10px !important; }
+      h2.text-headline-sm { margin-top: 8px !important; padding-top: 0 !important; break-after: avoid; break-inside: avoid; }
     }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen">
-  <nav class="border-b" style="background: var(--surface-1); border-color: var(--border);">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
-      <a href="/" class="font-semibold text-lg">🏠 PropSight</a>
-      <div class="flex gap-4 text-sm" style="color: var(--ink-2);">
-        <a href="/upload" class="hover:underline">Upload</a>
-        <a href="/reports" class="hover:underline">Reports</a>
+<body class="min-h-screen bg-background text-on-surface">
+
+{% if user %}
+<header class="bg-surface border-b border-outline-variant sticky top-0 z-50">
+  <div class="flex justify-between items-center h-[56px] px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto gap-4">
+
+    <div class="flex items-center gap-8 min-w-0">
+      <a href="/" class="text-headline-sm font-bold text-primary shrink-0">PropSight</a>
+      <nav class="hidden md:flex items-center gap-6 h-[56px]">
+        {% set nav_items = [('/reports/all', 'dashboard'), ('/sorter', 'sorter'), ('/datasets', 'datasets')] %}
+        {% for href, key in nav_items %}
+        <a href="{{ href }}"
+           class="h-full flex items-center text-body-sm transition-colors border-b-2
+                  {% if active_nav == key %}text-primary border-primary font-semibold{% else %}text-on-surface-variant border-transparent hover:text-primary{% endif %}">
+          {{ key | capitalize }}
+        </a>
+        {% endfor %}
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+      <!-- Upload is an action, not a place: it is the one thing you *do* here,
+           so it gets a button rather than a tab in the navigation. -->
+      <a href="/upload"
+         class="btn-primary h-8 px-3 sm:px-4 flex items-center gap-1.5 text-label-xs transition-opacity">
+        <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span>
+        <span class="hidden sm:inline">Upload leads</span>
+      </a>
+
+      <button id="theme-toggle" type="button" aria-label="Toggle dark mode"
+              class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+        <span class="material-symbols-outlined hidden dark:inline" style="font-size:20px;">light_mode</span>
+        <span class="material-symbols-outlined inline dark:hidden" style="font-size:20px;">dark_mode</span>
+      </button>
+
+      <div class="relative" id="user-menu">
+        <button type="button" id="user-menu-btn"
+                class="flex items-center gap-2 h-8 pl-1 pr-2 rounded-lg hover:bg-surface-container transition-colors"
+                aria-haspopup="true" aria-expanded="false">
+          <span class="w-7 h-7 rounded-full bg-primary text-on-primary grid place-items-center text-label-xs font-semibold">
+            {{ user.username[0] | upper }}
+          </span>
+          <span class="hidden sm:block text-body-sm text-on-surface-variant max-w-[10ch] truncate">{{ user.username }}</span>
+        </button>
+        <div id="user-menu-panel"
+             class="hidden absolute right-0 mt-2 w-56 rounded-xl border border-outline-variant bg-surface-container-lowest py-1 z-50"
+             style="box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+          <div class="px-3 py-2 border-b border-outline-variant">
+            <div class="text-body-sm font-semibold truncate">{{ user.username }}</div>
+            <div class="text-label-xs text-on-surface-variant uppercase tracking-wider mt-0.5">{{ user.role }}</div>
+          </div>
+          {% if user.role == 'admin' %}
+          <a href="/users" class="flex items-center gap-2 px-3 py-2 text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined" style="font-size:18px;">group</span> Manage users
+          </a>
+          {% endif %}
+          <a href="/logout" class="flex items-center gap-2 px-3 py-2 text-body-sm text-error hover:bg-error-container/30">
+            <span class="material-symbols-outlined" style="font-size:18px;">logout</span> Sign out
+          </a>
+        </div>
       </div>
     </div>
+  </div>
+
+  <!-- Mobile nav: the desktop bar has no room for it beside the upload button. -->
+  <nav class="md:hidden flex items-center gap-5 px-margin-mobile pb-2 -mt-1 text-body-sm">
+    <a href="/reports/all" class="{% if active_nav == 'dashboard' %}text-primary font-semibold{% else %}text-on-surface-variant{% endif %}">Dashboard</a>
+    <a href="/sorter" class="{% if active_nav == 'sorter' %}text-primary font-semibold{% else %}text-on-surface-variant{% endif %}">Sorter</a>
+    <a href="/datasets" class="{% if active_nav == 'datasets' %}text-primary font-semibold{% else %}text-on-surface-variant{% endif %}">Datasets</a>
   </nav>
-  <main class="max-w-6xl mx-auto px-4 py-6">
-    {% block content %}{% endblock %}
-  </main>
+</header>
+{% endif %}
+
+<main class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-6">
+  {% block content %}{% endblock %}
+</main>
+
+<script src="/static/theme.js"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,37 +1,30 @@
-"""Groq AI narrative layer for lead insights.
-
-Uses Groq's free-tier API (GROQ_API_KEY env var). Falls back gracefully to a
-plain message when the key is absent or the call fails.
+"""Groq narrative layer: 5-8 actionable insights over the computed report.
 
 What we send:
-  - Computed statistics: budget, configuration, HWC counts, buying status,
-    call status, and the cross-tab matrices.
-  - Raw qualitative remarks: up to REMARKS_SAMPLE rows, first REMARKS_MAX_CHARS
-    chars each. This is the primary qualitative signal.
+  - Computed statistics: budget, configuration, HWC counts, buying/call status,
+    the HWC x budget matrix, and lead-arrival timing.
+  - Raw qualitative remarks: a capped sample of rep-written notes, the only
+    genuinely qualitative signal in the dataset.
 
-Results are cached per report_id in memory by the caller; nothing is ever
-written to disk.
+Sending the whole report would blow the request size limit, so `_condense`
+picks the small, high-signal subset. Results are cached per report by the
+caller; nothing is written to disk.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import re
 
-import requests
+import pandas as pd
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-# Best reasoning models on Groq as of early 2025 — change via GROQ_MODEL env var.
-# Options include 'qwen/qwen3-32b' or 'llama-3.3-70b-versatile'
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+from . import llm
 
-REMARKS_SAMPLE = 150   # max rows of raw remarks to include
-REMARKS_MAX_CHARS = 180  # chars per remark before truncation
+REMARKS_SAMPLE = 40
+REMARKS_MAX_CHARS = 120
 
 _PROMPT = """\
 You are a real-estate sales analyst. You will receive:
-1. Computed statistics from a CRM lead dataset (budget, configuration, HWC flags, buying status, call status).
+1. Computed statistics from a CRM lead dataset (budget, configuration, HWC flags, buying status, call status, arrival timing).
 2. A sample of raw qualitative remarks written by sales reps about each lead.
 
 Return ONLY a JSON array of 5-8 insight objects, no prose, no code fences.
@@ -42,91 +35,62 @@ Focus on:
 - What do HWC-flagged leads specifically want?
 - What patterns or sentiment emerge from the remarks?
 - What does the buying/call status distribution say about pipeline health?
+- When should the team be calling, given when leads arrive?
 
+Many fields are recorded for only a minority of leads. When a statistic rests on
+a small subset, say so in the finding and lower the confidence accordingly.
 Base every finding strictly on the data provided.
 
 DATA:
 """
 
-
-def _condense(report: dict, df_remarks=None) -> str:
-    """Build a compact prompt payload from stats + sampled remarks."""
-    # Only send high-level stats and smaller cross-tabs to save tokens
-    keys = [
-        "meta", "core", "budget", "configuration",
-        "call_status", "buying_status",
-        "hwc_x_budget"
-    ]
-    stats = {k: report[k] for k in keys if k in report}
-    payload: dict = {"statistics": stats}
-
-    # Attach raw remarks sample if the caller supplied the DataFrame
-    if df_remarks is not None:
-        col = df_remarks.get("qualitative_remarks",
-                             df_remarks.get("remarks",
-                             __import__("pandas").Series(dtype=object)))
-        non_empty = col.dropna().astype(str).str.strip()
-        non_empty = non_empty[non_empty != ""]
-        sample = non_empty.head(40).tolist()  # Reduced from 150 to 40 to avoid 413
-        payload["sample_remarks"] = [r[:100] for r in sample]
-
-    text = json.dumps(payload, default=str)
-    # Don't blindly truncate the JSON string, let it be valid JSON.
-    # The reduced sample size ensures it stays well under limits.
-    return text
+_STAT_KEYS = [
+    "meta", "core", "budget", "configuration",
+    "call_status", "buying_status", "hwc_x_budget",
+    "time", "data_quality",
+]
 
 
-def generate_insights(report: dict, df=None) -> dict:
-    api_key = os.environ.get("GROQ_API_KEY", "").strip()
-    if not api_key:
+def _condense(report: dict, df: pd.DataFrame | None = None) -> str:
+    payload: dict = {"statistics": {k: report[k] for k in _STAT_KEYS if k in report}}
+
+    if df is not None and "qualitative_remarks" in df.columns:
+        remarks = df["qualitative_remarks"].dropna().astype(str).str.strip()
+        remarks = remarks[remarks != ""]
+        payload["sample_remarks"] = [r[:REMARKS_MAX_CHARS] for r in remarks.head(REMARKS_SAMPLE)]
+
+    return json.dumps(payload, default=str)
+
+
+def generate_insights(report: dict, df: pd.DataFrame | None = None) -> dict:
+    """Return {"insights": [...]} or {"error": "..."} — never raises."""
+    if not llm.is_enabled():
         return {
             "error": (
                 "GROQ_API_KEY is not set — AI insights are disabled. "
                 "Add the key to your .env file to enable this panel."
             )
         }
-    model = os.environ.get("GROQ_MODEL", DEFAULT_MODEL)
-    try:
-        resp = requests.post(
-            GROQ_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": _PROMPT + _condense(report, df)}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 2048,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-    except Exception as exc:
-        return {"error": f"AI insights unavailable: {exc}"}
 
-    try:
-        match = re.search(r"\[.*\]", content, re.DOTALL)
-        insights = json.loads(match.group() if match else content)
-        assert isinstance(insights, list) and insights
-    except Exception:
-        return {"error": "AI insights unavailable: model returned unparseable output."}
+    insights, err = llm.chat_json_status(_PROMPT + _condense(report, df), max_tokens=2048)
+    if err == "rate_limit":
+        return {
+            "error": "AI insights are temporarily rate-limited by the model provider. Try again in a minute.",
+            "retryable": True,
+        }
+    if not isinstance(insights, list) or not insights:
+        return {"error": "AI insights unavailable: the model returned no usable output."}
 
-    cleaned = []
-    for item in insights[:8]:
-        if not isinstance(item, dict):
-            continue
-        cleaned.append(
-            {
-                "title": str(item.get("title", "")),
-                "finding": str(item.get("finding", "")),
-                "action": str(item.get("action", "")),
-                "confidence": str(item.get("confidence", "medium")),
-            }
-        )
+    cleaned = [
+        {
+            "title": str(item.get("title", "")),
+            "finding": str(item.get("finding", "")),
+            "action": str(item.get("action", "")),
+            "confidence": str(item.get("confidence", "medium")),
+        }
+        for item in insights[:8]
+        if isinstance(item, dict) and item.get("title")
+    ]
     if not cleaned:
-        return {"error": "AI insights unavailable: model returned no usable insights."}
+        return {"error": "AI insights unavailable: the model returned no usable insights."}
     return {"insights": cleaned}

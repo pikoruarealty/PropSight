@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Sign in — PropSight{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+  <div class="w-full max-w-sm">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <div class="text-2xl font-bold text-primary">PropSight</div>
+        <p class="text-body-sm text-on-surface-variant mt-1">Lead intelligence, signed in.</p>
+      </div>
+      <button id="theme-toggle" type="button" aria-label="Toggle dark mode"
+              class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+        <span class="material-symbols-outlined hidden dark:inline" style="font-size:20px;">light_mode</span>
+        <span class="material-symbols-outlined inline dark:hidden" style="font-size:20px;">dark_mode</span>
+      </button>
+    </div>
+
+    <form method="post" action="/login" class="card p-6 space-y-4">
+      <h1 class="text-headline-sm">Sign in</h1>
+
+      {% if error %}
+      <div class="flex items-start gap-2 rounded-lg px-3 py-2 bg-error-container text-on-error-container text-body-sm">
+        <span class="material-symbols-outlined shrink-0" style="font-size:18px;">error</span>
+        <span>{{ error }}</span>
+      </div>
+      {% endif %}
+
+      <input type="hidden" name="next" value="{{ next | default('/', true) }}">
+
+      <label class="block">
+        <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Username</span>
+        <input name="username" required autofocus autocomplete="username" value="{{ username | default('', true) }}"
+               class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm">
+      </label>
+
+      <label class="block">
+        <span class="text-label-xs uppercase tracking-wider text-on-surface-variant">Password</span>
+        <input name="password" type="password" required autocomplete="current-password"
+               class="mt-1 w-full h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm">
+      </label>
+
+      <button type="submit" class="btn-primary w-full h-9 text-body-sm">Sign in</button>
+
+      <p class="text-body-sm text-on-surface-variant text-center pt-1">
+        No account? <a href="/register" class="text-primary hover:underline font-semibold">Create one</a>
+      </p>
+    </form>
+  </div>
+</div>
+{% endblock %}

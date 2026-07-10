@@ -28,3 +28,12 @@ def report_insights(report_id: str):
     if data is None:
         raise HTTPException(404, "Report not found or not confirmed yet.")
     return data
+
+
+@router.get("/reports/{report_id}/chart-summaries")
+def report_chart_summaries(report_id: str):
+    """Plain-English caption per cross-tab chart (static text when the LLM is off)."""
+    data = report_service.get_chart_summaries(report_id)
+    if data is None:
+        raise HTTPException(404, "Report not found or not confirmed yet.")
+    return {"summaries": data}

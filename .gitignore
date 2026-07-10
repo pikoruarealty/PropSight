@@ -18,12 +18,18 @@ __pycache__/
 *.swp
 *.swo
 
-# Data
+# Client lead exports — never commit real customer data.
 *.csv
 *.xlsx
 *.xls
 # Except sample data if you want to track it
 !sample_data/
 
-# Tests
+# Legacy report storage. Reports now live in MongoDB; this only ever holds
+# leftovers from a pre-MongoDB install, which are real customer records.
+data/
+
+# Stitch design export — reference mockups, not shipped code.
+stitch_propsight_lead_intelligence_tool/
+
 tests/

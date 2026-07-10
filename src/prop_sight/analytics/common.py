@@ -57,6 +57,32 @@ def quality_rate(df: pd.DataFrame) -> float | None:
     return round(float(is_quality(df).mean()), 4)
 
 
+def fold_case_variants(series: pd.Series) -> pd.Series:
+    """Merge values that differ only in casing or surrounding whitespace.
+
+    Reps type free text into status columns, so 'Call back later' and
+    'Call Back Later' arrive as two categories describing one outcome. Split
+    like that they show up as two donut slices and two crosstab rows.
+
+    The surviving spelling is the one written most often (ties broken
+    alphabetically for determinism), so the label shown is the one the team
+    actually uses rather than whichever row happened to sort first.
+    """
+    values = clean_str(series)
+    folded = values.str.lower()
+
+    counts = pd.DataFrame({"value": values, "key": folded}).dropna()
+    if counts.empty:
+        return values
+
+    ranked = (
+        counts.groupby(["key", "value"]).size().reset_index(name="n")
+        .sort_values(["key", "n", "value"], ascending=[True, False, True])
+    )
+    canonical = ranked.drop_duplicates("key").set_index("key")["value"]
+    return folded.map(canonical).astype("string")
+
+
 def value_counts_list(series: pd.Series, top: int | None = None) -> list[dict]:
     """[{value, count, share}] sorted by count desc; NaN/empty excluded."""
     vals = clean_str(series).dropna()
@@ -71,12 +97,31 @@ def value_counts_list(series: pd.Series, top: int | None = None) -> list[dict]:
 
 
 def crosstab_dict(rows: pd.Series, cols: pd.Series) -> dict:
-    """JSON-friendly crosstab: {rows: [...], cols: [...], matrix: [[...]]}."""
+    """JSON-friendly crosstab plus the coverage it was computed from.
+
+    A crosstab can only count rows where BOTH variables are recorded. In this
+    dataset most leads have neither a configuration nor a budget filled in, so
+    a chart drawn from the matrix alone silently represents a small minority of
+    leads while looking like it represents all of them — and two charts sharing
+    an axis disagree on that axis's totals because each drops a different set of
+    rows.
+
+    `coverage` makes that explicit so the UI can caption every crosstab with the
+    denominator its numbers actually refer to:
+        {counted, total, missing_rows, missing_cols}
+    """
     r = clean_str(rows)
     c = clean_str(cols)
+    total = int(len(r))
     mask = r.notna() & c.notna()
+    coverage = {
+        "counted": int(mask.sum()),
+        "total": total,
+        "missing_rows": int(r.isna().sum()),
+        "missing_cols": int(c.isna().sum()),
+    }
     if not mask.any():
-        return {"rows": [], "cols": [], "matrix": []}
+        return {"rows": [], "cols": [], "matrix": [], "coverage": coverage}
     ct = pd.crosstab(r[mask], c[mask])
     # Order both axes by marginal totals (largest first) for readable charts.
     ct = ct.loc[
@@ -87,6 +132,7 @@ def crosstab_dict(rows: pd.Series, cols: pd.Series) -> dict:
         "rows": [str(v) for v in ct.index],
         "cols": [str(v) for v in ct.columns],
         "matrix": [[int(x) for x in row] for row in ct.values],
+        "coverage": coverage,
     }
 
 

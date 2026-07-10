@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% set active_nav = 'datasets' %}
+{% block title %}Datasets — PropSight{% endblock %}
+{% block content %}
+
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
+  <div>
+    <h1 class="text-[24px] font-bold text-on-surface">Datasets</h1>
+    <p class="text-body-sm text-on-surface-variant mt-1">
+      Every upload feeds one combined dashboard. Open a single dataset only to inspect
+      or remove it; discarding one rebuilds the combined view without it.
+    </p>
+  </div>
+  <a href="/upload" class="btn-primary h-8 px-4 flex items-center gap-1.5 text-label-xs shrink-0">
+    <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span> Upload leads
+  </a>
+</div>
+
+{% if error %}
+<div class="flex items-start gap-2 rounded-lg px-3 py-2.5 mb-5 bg-error-container text-on-error-container text-body-sm">
+  <span class="material-symbols-outlined shrink-0" style="font-size:18px;">error</span>
+  <span>{{ error }}</span>
+</div>
+{% endif %}
+
+{% if has_combined %}
+<a href="/reports/all"
+   class="card p-4 mb-6 flex items-center gap-4 hover:border-primary transition-colors group">
+  <span class="w-10 h-10 rounded-lg bg-primary-fixed grid place-items-center shrink-0">
+    <span class="material-symbols-outlined text-primary" style="font-size:20px;">stacked_bar_chart</span>
+  </span>
+  <div class="flex-1 min-w-0">
+    <div class="text-headline-sm text-on-surface">All leads — every file, merged and deduplicated</div>
+    <p class="text-body-sm text-on-surface-variant mt-0.5">Access the master database compiled from all your uploads.</p>
+  </div>
+  <span class="w-9 h-9 rounded-full border border-outline-variant grid place-items-center text-on-surface-variant group-hover:border-primary group-hover:text-primary transition-colors shrink-0">
+    <span class="material-symbols-outlined" style="font-size:18px;">arrow_forward</span>
+  </span>
+</a>
+{% endif %}
+
+{% if reports %}
+<div class="flex items-baseline justify-between mb-3">
+  <h2 class="text-headline-sm">Recent uploads</h2>
+  <span class="text-body-sm text-on-surface-variant">Showing {{ reports | length }} file{{ '' if reports | length == 1 else 's' }}</span>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left whitespace-nowrap">
+      <thead>
+        <tr class="bg-surface-container-low border-b border-outline-variant text-on-surface-variant text-label-xs uppercase">
+          <th class="p-3 font-semibold">Filename</th>
+          <th class="p-3 font-semibold">Status</th>
+          <th class="p-3 font-semibold text-right">Row count</th>
+          <th class="p-3 font-semibold">Created</th>
+          <th class="p-3 font-semibold text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant text-body-sm">
+        {% for r in reports %}
+        <tr id="report-{{ r.report_id }}" class="hover:bg-surface-container-low transition-colors">
+          <td class="p-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-on-surface-variant shrink-0" style="font-size:18px;">table_view</span>
+              {% if r.status == "ready" %}
+              <a href="/reports/{{ r.report_id }}" class="text-on-surface hover:text-primary hover:underline truncate">{{ r.files | join(", ") }}</a>
+              {% else %}
+              <span class="text-on-surface truncate">{{ r.files | join(", ") }}</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="p-3">
+            {% if r.status == "ready" %}
+            <span class="px-2 py-0.5 rounded-full bg-primary/15 text-primary text-label-xs">Ready</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary text-label-xs"
+                  title="Property types not confirmed">Draft</span>
+            {% endif %}
+          </td>
+          <td class="p-3 text-right tabular-nums">{{ "{:,}".format(r.row_count) }}</td>
+          <td class="p-3 text-on-surface-variant tabular-nums">{{ r.created_at | pretty_datetime }}</td>
+          <td class="p-3 text-right">
+            <button class="discard-btn h-7 px-3 rounded-lg border border-error/40 text-error hover:bg-error-container/30 text-label-xs"
+                    data-id="{{ r.report_id }}">Discard</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card p-12 text-center">
+  <span class="material-symbols-outlined text-outline" style="font-size:40px;">folder_open</span>
+  <p class="text-body-md text-on-surface-variant mt-2">No datasets yet.</p>
+  <a href="/upload" class="btn-primary inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-body-sm">
+    <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span> Upload workbooks
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/app.js"></script>
+<script>
+document.querySelectorAll('.discard-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Discard this dataset? This cannot be undone.')) return;
+    await withBtnLoading(btn, 'Discarding…', async () => {
+      const res = await fetch(`/reports/${btn.dataset.id}`, { method: 'DELETE' });
+      if (res.ok) document.getElementById(`report-${btn.dataset.id}`).remove();
+    });
+  });
+});
+</script>
+{% endblock %}
