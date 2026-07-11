@@ -34,6 +34,36 @@ def _attachment(content: bytes, filename: str, media_type: str) -> Response:
     )
 
 
+def _filtered_df(
+    entry: dict,
+    *,
+    property_type: str | None,
+    source_file: str | None,
+    budget_min: float | None,
+    budget_max: float | None,
+    configuration: str | None,
+    call_status: str | None,
+    buying_status: str | None,
+    hwc_only: bool,
+):
+    """Apply the Sorter's filter panel to the report's frame before slicing/exporting.
+
+    Distinct from `/api/reports/{id}/fields`, which stays unfiltered — rules are
+    global by design, only what gets classified-and-downloaded here is narrowed.
+    """
+    return report_service.apply_filters(
+        entry["df"],
+        property_type=property_type or None,
+        source_file=source_file or None,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        configuration=report_service.csv_list(configuration),
+        call_status=report_service.csv_list(call_status),
+        buying_status=report_service.csv_list(buying_status),
+        hwc_only=hwc_only,
+    )
+
+
 @router.get("/api/rules")
 def get_rules():
     return {"rules": rules_service.load_rules(), "operators": rules_engine.OPERATORS}
@@ -59,11 +89,33 @@ def get_fields(report_id: str):
 
 
 @router.get("/api/reports/{report_id}/classification")
-def get_classification(report_id: str, preview_limit: int = Query(10, ge=0, le=100)):
+def get_classification(
+    report_id: str,
+    preview_limit: int = Query(10, ge=0, le=100),
+    property_type: str | None = None,
+    source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: str | None = None,
+    call_status: str | None = None,
+    buying_status: str | None = None,
+    hwc_only: bool = False,
+):
     """Counts, unclassified reasons, and a preview of the good leads."""
     entry = _entry_or_404(report_id)
     rule_list = rules_service.load_rules()
-    classified = classify_frame(entry["df"], rule_list)
+    df = _filtered_df(
+        entry,
+        property_type=property_type,
+        source_file=source_file,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        configuration=configuration,
+        call_status=call_status,
+        buying_status=buying_status,
+        hwc_only=hwc_only,
+    )
+    classified = classify_frame(df, rule_list)
 
     summary = rules_engine.classification_summary(classified)
     good = classified[classified[rules_engine.CLASS_COL] == rules_engine.GOOD]
@@ -89,12 +141,33 @@ def get_classification(report_id: str, preview_limit: int = Query(10, ge=0, le=1
 
 
 @router.get("/api/reports/{report_id}/export/{category}.xlsx")
-def export_class(report_id: str, category: str, columns: str | None = None):
+def export_class(
+    report_id: str,
+    category: str,
+    columns: str | None = None,
+    property_type: str | None = None,
+    source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: str | None = None,
+    call_status: str | None = None,
+    buying_status: str | None = None,
+    hwc_only: bool = False,
+):
     entry = _entry_or_404(report_id)
+    df = _filtered_df(
+        entry,
+        property_type=property_type,
+        source_file=source_file,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        configuration=configuration,
+        call_status=call_status,
+        buying_status=buying_status,
+        hwc_only=hwc_only,
+    )
     try:
-        rows = export_service.classified_slice(
-            entry["df"], rules_service.load_rules(), category
-        )
+        rows = export_service.classified_slice(df, rules_service.load_rules(), category)
     except ValueError as exc:
         raise HTTPException(404, str(exc))
 
@@ -108,12 +181,31 @@ def export_class(report_id: str, category: str, columns: str | None = None):
 
 
 @router.get("/api/reports/{report_id}/export/meta-audience.csv")
-def export_meta_audience(report_id: str):
+def export_meta_audience(
+    report_id: str,
+    property_type: str | None = None,
+    source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: str | None = None,
+    call_status: str | None = None,
+    buying_status: str | None = None,
+    hwc_only: bool = False,
+):
     """Meta customer-list CSV built from the good leads."""
     entry = _entry_or_404(report_id)
-    rows = export_service.classified_slice(
-        entry["df"], rules_service.load_rules(), rules_engine.GOOD
+    df = _filtered_df(
+        entry,
+        property_type=property_type,
+        source_file=source_file,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        configuration=configuration,
+        call_status=call_status,
+        buying_status=buying_status,
+        hwc_only=hwc_only,
     )
+    rows = export_service.classified_slice(df, rules_service.load_rules(), rules_engine.GOOD)
     if rows.empty:
         raise HTTPException(404, "No good leads to export.")
 

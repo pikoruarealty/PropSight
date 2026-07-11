@@ -57,11 +57,57 @@
        class="hidden bg-surface-container border border-l-4 border-outline-variant border-l-primary
               rounded-lg px-4 py-3 text-body-sm text-on-surface-variant"></div>
 
-  <!-- Segment + property-type + file filters -->
-  <div class="hide-on-print flex flex-wrap items-center gap-3 bg-surface border border-outline-variant p-2 rounded-lg">
-    <div id="focus-chips" class="flex flex-wrap gap-2"></div>
-    <div id="file-tabs"   class="flex flex-wrap gap-2"></div>
-    <div id="type-tabs"   class="flex flex-wrap gap-2 ml-auto"></div>
+  <!-- Filters: segment, files, property type, budget, configuration, call/buying status -->
+  <div class="hide-on-print relative" id="filters-root">
+    <button id="filters-btn" type="button" aria-haspopup="true" aria-expanded="false"
+            class="btn-secondary h-9 px-3 flex items-center gap-1.5 text-body-sm">
+      <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>
+      Filters
+      <span id="filters-badge" class="hidden px-1.5 py-0.5 rounded-full text-label-xs font-bold leading-none"
+            style="background: rgb(var(--primary) / 0.15); color: rgb(var(--primary));"></span>
+    </button>
+    <div id="filters-panel"
+         class="hidden absolute left-0 mt-2 w-[min(92vw,560px)] max-h-[75vh] overflow-y-auto rounded-xl
+                border border-outline-variant bg-surface-container-lowest p-4 z-40 flex flex-col gap-4"
+         style="box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+      <div>
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Segment</p>
+        <div id="focus-chips" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Files</p>
+        <div id="file-tabs" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Property type</p>
+        <div id="type-tabs" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Budget (₹ Cr)</p>
+        <div class="flex items-center gap-2">
+          <input id="filter-budget-min" type="number" min="0" step="0.1" placeholder="Min"
+                 class="h-9 px-2 w-24 rounded-lg text-body-sm border border-outline-variant bg-surface text-on-surface">
+          <span class="text-on-surface-variant">–</span>
+          <input id="filter-budget-max" type="number" min="0" step="0.1" placeholder="Max"
+                 class="h-9 px-2 w-24 rounded-lg text-body-sm border border-outline-variant bg-surface text-on-surface">
+        </div>
+      </div>
+      <div id="filter-config-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Configuration</p>
+        <div id="filter-config" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="filter-call-status-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Call status</p>
+        <div id="filter-call-status" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="filter-buying-status-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Buying status</p>
+        <div id="filter-buying-status" class="flex flex-wrap gap-2"></div>
+      </div>
+      <button id="filters-clear" class="text-label-xs text-primary hover:underline self-start pt-1 border-t border-outline-variant w-full text-left">
+        Clear all filters
+      </button>
+    </div>
   </div>
 
   <!-- Row 1: HWC donut + Budget -->

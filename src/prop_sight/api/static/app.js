@@ -440,6 +440,19 @@ let currentFile       = 'all';
 let chartSummaries    = {};
 let hasClassification = false;
 
+/* ── extra filters: budget range + configuration/call/buying status ──
+ * Option lists are captured once from the *unfiltered* initial payload (same
+ * idea as allPropertyTypes/allFiles above) so picking one filter doesn't make
+ * the others' checklists shrink out from under the user mid-selection. */
+let budgetMin             = null;
+let budgetMax             = null;
+let configFilter          = [];
+let callStatusFilter      = [];
+let buyingStatusFilter    = [];
+let allConfigValues       = [];
+let allCallStatusValues   = [];
+let allBuyingStatusValues = [];
+
 /* ================================================================== */
 /* Init                                                                */
 /* ================================================================== */
@@ -450,12 +463,22 @@ let lastData = null;
 async function initDashboard() {
   try {
     const data = await fetchJSON(`/reports/${window.REPORT_ID}/data`);
-    allPropertyTypes = data.meta.property_types || [];
-    allFiles         = data.meta.source_files || [];
+    allPropertyTypes      = data.meta.property_types || [];
+    allFiles              = data.meta.source_files || [];
+    allConfigValues       = (data.configuration?.overall || []).map(c => c.value);
+    allCallStatusValues   = (data.call_status?.distribution || []).map(x => x.value);
+    allBuyingStatusValues = (data.buying_status?.distribution || []).map(x => x.value);
     hasClassification = !!(data.availability || {}).classification;
     renderChips();
     renderFileTabs();
     renderTypeTabs();
+    renderConfigFilter();
+    renderCallStatusFilter();
+    renderBuyingStatusFilter();
+    wireBudgetFilter();
+    wireFiltersClear();
+    wireFilterDropdown('filters-btn', 'filters-panel');
+    updateFiltersBadge();
     renderAll(data);
     loadChartSummaries();
     loadInsights();
@@ -463,6 +486,137 @@ async function initDashboard() {
   } catch (err) {
     document.getElementById('loading').textContent = '⚠ ' + err.message;
   }
+}
+
+/* ── generic collapsible filter-panel toggle (Reports + Sorter both use this) ──
+ * Mirrors the user-menu dropdown pattern in theme.js: click to toggle, click
+ * anywhere outside or Escape to close, aria-expanded kept in sync. */
+function wireFilterDropdown(btnId, panelId) {
+  const btn = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
+  if (!btn || !panel) return;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opening = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !opening);
+    btn.setAttribute('aria-expanded', String(opening));
+  });
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => {
+    panel.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      panel.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+/* ── multi-select pill list, shared by configuration/call-status/buying-status ── */
+function renderMultiPills(containerId, wrapId, values, selected, onToggle) {
+  const wrap = document.getElementById(wrapId);
+  if (wrap) wrap.classList.toggle('hidden', !values.length);
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = values.map(v => {
+    const active = selected.includes(v);
+    return `<button type="button" data-val="${esc(v)}"
+      class="pill-btn px-3 py-1.5 rounded-full text-sm border font-medium ${active ? 'tab-active' : ''}"
+      style="border-color: var(--border); ${active ? '' : 'background: var(--surface-1); color: var(--ink-2);'}">
+      ${esc(v)}</button>`;
+  }).join('');
+  container.querySelectorAll('.pill-btn').forEach(btn => btn.addEventListener('click', () => {
+    const v = btn.dataset.val;
+    const idx = selected.indexOf(v);
+    if (idx >= 0) selected.splice(idx, 1); else selected.push(v);
+    onToggle();
+  }));
+}
+
+function renderConfigFilter() {
+  renderMultiPills('filter-config', 'filter-config-wrap', allConfigValues, configFilter, () => {
+    renderConfigFilter();
+    updateFiltersBadge();
+    reload();
+  });
+}
+function renderCallStatusFilter() {
+  renderMultiPills('filter-call-status', 'filter-call-status-wrap', allCallStatusValues, callStatusFilter, () => {
+    renderCallStatusFilter();
+    updateFiltersBadge();
+    reload();
+  });
+}
+function renderBuyingStatusFilter() {
+  renderMultiPills('filter-buying-status', 'filter-buying-status-wrap', allBuyingStatusValues, buyingStatusFilter, () => {
+    renderBuyingStatusFilter();
+    updateFiltersBadge();
+    reload();
+  });
+}
+
+function wireBudgetFilter() {
+  const min = document.getElementById('filter-budget-min');
+  const max = document.getElementById('filter-budget-max');
+  if (!min || !max) return;
+  const apply = () => {
+    budgetMin = min.value !== '' ? min.value : null;
+    budgetMax = max.value !== '' ? max.value : null;
+    updateFiltersBadge();
+    reload();
+  };
+  min.addEventListener('change', apply);
+  max.addEventListener('change', apply);
+}
+
+function wireFiltersClear() {
+  const btn = document.getElementById('filters-clear');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    currentSegment = 'all';
+    currentType = 'all';
+    currentFile = 'all';
+    budgetMin = null;
+    budgetMax = null;
+    configFilter = [];
+    callStatusFilter = [];
+    buyingStatusFilter = [];
+    const min = document.getElementById('filter-budget-min');
+    const max = document.getElementById('filter-budget-max');
+    if (min) min.value = '';
+    if (max) max.value = '';
+    renderChips();
+    renderTypeTabs();
+    renderFileTabs();
+    renderConfigFilter();
+    renderCallStatusFilter();
+    renderBuyingStatusFilter();
+    updateFiltersBadge();
+    reload();
+  });
+}
+
+function activeFilterCount() {
+  let n = 0;
+  if (currentSegment !== 'all') n++;
+  if (currentType !== 'all') n++;
+  if (currentFile !== 'all') n++;
+  if (budgetMin !== null) n++;
+  if (budgetMax !== null) n++;
+  if (configFilter.length) n++;
+  if (callStatusFilter.length) n++;
+  if (buyingStatusFilter.length) n++;
+  return n;
+}
+
+function updateFiltersBadge(badgeId = 'filters-badge') {
+  const badge = document.getElementById(badgeId);
+  if (!badge) return;
+  const n = activeFilterCount();
+  badge.textContent = String(n);
+  badge.classList.toggle('hidden', n === 0);
 }
 
 /* ── PDF export: section picker, persisted in localStorage ── */
@@ -534,6 +688,9 @@ document.addEventListener('propsight:themechange', () => {
     renderChips();
     renderFileTabs();
     renderTypeTabs();
+    renderConfigFilter();
+    renderCallStatusFilter();
+    renderBuyingStatusFilter();
     renderAll(lastData);
   }
 });
@@ -543,6 +700,11 @@ function currentQuery() {
   if (currentType    !== 'all') params.set('property_type', currentType);
   if (currentSegment !== 'all') params.set('segment', currentSegment);
   if (currentFile    !== 'all') params.set('source_file', currentFile);
+  if (budgetMin !== null && budgetMin !== '') params.set('budget_min', budgetMin);
+  if (budgetMax !== null && budgetMax !== '') params.set('budget_max', budgetMax);
+  if (configFilter.length) params.set('configuration', configFilter.join(','));
+  if (callStatusFilter.length) params.set('call_status', callStatusFilter.join(','));
+  if (buyingStatusFilter.length) params.set('buying_status', buyingStatusFilter.join(','));
   const q = params.toString();
   return q ? `?${q}` : '';
 }
@@ -582,6 +744,7 @@ function renderChips() {
   document.querySelectorAll('.chip-btn').forEach(btn => btn.addEventListener('click', () => {
     currentSegment = btn.dataset.seg;
     renderChips();
+    updateFiltersBadge();
     reload(document.querySelector(`.chip-btn[data-seg="${CSS.escape(currentSegment)}"]`));
   }));
 }
@@ -596,6 +759,7 @@ function renderTypeTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
     currentType = btn.dataset.type;
     renderTypeTabs();
+    updateFiltersBadge();
     reload(document.querySelector(`.tab-btn[data-type="${CSS.escape(currentType)}"]`));
   }));
 }
@@ -616,6 +780,7 @@ function renderFileTabs() {
   document.querySelectorAll('.file-btn').forEach(btn => btn.addEventListener('click', () => {
     currentFile = btn.dataset.file;
     renderFileTabs();
+    updateFiltersBadge();
     reload(document.querySelector(`.file-btn[data-file="${CSS.escape(currentFile)}"]`));
   }));
 }
@@ -796,7 +961,17 @@ function renderTime(d, has) {
 
   // Hour-of-day exists only where a timestamp carries a clock time. Legacy sheets
   // store a bare date; charting those as midnight would fabricate a 00:00 spike.
-  if (toggleCard('card-time-hour', has.time_of_day)) {
+  // When there aren't enough timed leads yet, this card explains why the space
+  // beside the weekday chart isn't a chart, instead of just staying blank.
+  if (!has.time_of_day && toggleCard('card-time-hour', true)) {
+    setCard('card-time-hour', cardTitle('Leads by hour of day', 'not enough leads carry a clock time yet'));
+    document.getElementById('card-time-hour').insertAdjacentHTML('beforeend', `
+      <p class="text-sm" style="color: var(--ink-2);">
+        Only <b>${num(t.timed_leads)}</b> of <b>${num(t.dated_leads)}</b> dated leads carry an actual time of
+        day — the rest record just a date. At least <b>${num(t.min_timed_leads ?? 30)}</b> timed leads are
+        needed before an hourly chart would mean anything.
+      </p>`);
+  } else if (toggleCard('card-time-hour', has.time_of_day)) {
     const peak = t.peak || {};
     setCard('card-time-hour', cardTitle('Leads by hour of day',
       `${num(t.timed_leads)} leads carry a time of day`));

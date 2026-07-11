@@ -15,8 +15,25 @@ def get_report_json(
     property_type: str | None = None,
     segment: str | None = None,
     source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: str | None = None,
+    call_status: str | None = None,
+    buying_status: str | None = None,
+    hwc_only: bool = False,
 ):
-    data = report_service.get_report_data(report_id, property_type, segment, source_file)
+    data = report_service.get_report_data(
+        report_id,
+        property_type,
+        segment,
+        source_file,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        configuration=report_service.csv_list(configuration),
+        call_status=report_service.csv_list(call_status),
+        buying_status=report_service.csv_list(buying_status),
+        hwc_only=hwc_only,
+    )
     if not data:
         raise HTTPException(404, "Report not found or not ready")
     return data

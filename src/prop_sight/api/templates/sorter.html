@@ -23,6 +23,61 @@
 
 <div id="sorter" class="hidden flex flex-col gap-gutter">
 
+  <!-- Filters: narrows what gets classified and downloaded below (rules themselves stay global) -->
+  <div class="hide-on-print relative" id="sorter-filters-root">
+    <button id="sorter-filters-btn" type="button" aria-haspopup="true" aria-expanded="false"
+            class="btn-secondary h-9 px-3 flex items-center gap-1.5 text-body-sm">
+      <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>
+      Filters
+      <span id="sorter-filters-badge" class="hidden px-1.5 py-0.5 rounded-full text-label-xs font-bold leading-none"
+            style="background: rgb(var(--primary) / 0.15); color: rgb(var(--primary));"></span>
+    </button>
+    <div id="sorter-filters-panel"
+         class="hidden absolute left-0 mt-2 w-[min(92vw,560px)] max-h-[75vh] overflow-y-auto rounded-xl
+                border border-outline-variant bg-surface-container-lowest p-4 z-40 flex flex-col gap-4"
+         style="box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+      <p class="text-body-sm text-on-surface-variant -mt-1">
+        Narrows the counts and downloads below. Rules themselves still apply to every lead.
+      </p>
+      <div id="sorter-filter-type-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Property type</p>
+        <div id="sorter-filter-type" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="sorter-filter-file-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Files</p>
+        <div id="sorter-filter-file" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Budget (₹ Cr)</p>
+        <div class="flex items-center gap-2">
+          <input id="sorter-filter-budget-min" type="number" min="0" step="0.1" placeholder="Min"
+                 class="h-9 px-2 w-24 rounded-lg text-body-sm border border-outline-variant bg-surface text-on-surface">
+          <span class="text-on-surface-variant">–</span>
+          <input id="sorter-filter-budget-max" type="number" min="0" step="0.1" placeholder="Max"
+                 class="h-9 px-2 w-24 rounded-lg text-body-sm border border-outline-variant bg-surface text-on-surface">
+        </div>
+      </div>
+      <div id="sorter-filter-config-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Configuration</p>
+        <div id="sorter-filter-config" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="sorter-filter-call-status-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Call status</p>
+        <div id="sorter-filter-call-status" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="sorter-filter-buying-status-wrap" class="hidden">
+        <p class="text-label-xs uppercase tracking-wider text-on-surface-variant mb-2">Buying status</p>
+        <div id="sorter-filter-buying-status" class="flex flex-wrap gap-2"></div>
+      </div>
+      <label class="flex items-center gap-2 text-body-sm cursor-pointer text-on-surface">
+        <input type="checkbox" id="sorter-filter-hwc-only"> HWC-marked only
+      </label>
+      <button id="sorter-filters-clear" class="text-label-xs text-primary hover:underline self-start pt-1 border-t border-outline-variant w-full text-left">
+        Clear all filters
+      </button>
+    </div>
+  </div>
+
   <!-- Counts -->
   <div id="class-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-gutter"></div>
 

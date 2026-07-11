@@ -17,6 +17,160 @@ const VALUELESS_OPS = new Set(['is_empty', 'is_not_empty']);
 
 const fieldByName = (name) => FIELDS.find(f => f.field === name);
 
+/* ── filters: narrow what gets classified/downloaded below (rules stay global) ── */
+let sorterPropertyType      = 'all';
+let sorterSourceFile        = 'all';
+let sorterBudgetMin         = null;
+let sorterBudgetMax         = null;
+let sorterConfigFilter      = [];
+let sorterCallStatusFilter  = [];
+let sorterBuyingStatusFilter = [];
+let sorterHwcOnly           = false;
+
+function filterQuery() {
+  const params = new URLSearchParams();
+  if (sorterPropertyType !== 'all') params.set('property_type', sorterPropertyType);
+  if (sorterSourceFile   !== 'all') params.set('source_file', sorterSourceFile);
+  if (sorterBudgetMin !== null) params.set('budget_min', sorterBudgetMin);
+  if (sorterBudgetMax !== null) params.set('budget_max', sorterBudgetMax);
+  if (sorterConfigFilter.length) params.set('configuration', sorterConfigFilter.join(','));
+  if (sorterCallStatusFilter.length) params.set('call_status', sorterCallStatusFilter.join(','));
+  if (sorterBuyingStatusFilter.length) params.set('buying_status', sorterBuyingStatusFilter.join(','));
+  if (sorterHwcOnly) params.set('hwc_only', 'true');
+  return params.toString();
+}
+
+function updateSorterFiltersBadge() {
+  const badge = document.getElementById('sorter-filters-badge');
+  if (!badge) return;
+  let n = 0;
+  if (sorterPropertyType !== 'all') n++;
+  if (sorterSourceFile   !== 'all') n++;
+  if (sorterBudgetMin !== null) n++;
+  if (sorterBudgetMax !== null) n++;
+  if (sorterConfigFilter.length) n++;
+  if (sorterCallStatusFilter.length) n++;
+  if (sorterBuyingStatusFilter.length) n++;
+  if (sorterHwcOnly) n++;
+  badge.textContent = String(n);
+  badge.classList.toggle('hidden', n === 0);
+}
+
+function renderSorterTypeFilter() {
+  const field = fieldByName('property_type');
+  const values = field ? field.values : [];
+  const wrap = document.getElementById('sorter-filter-type-wrap');
+  if (wrap) wrap.classList.toggle('hidden', values.length === 0);
+  const tabs = ['all', ...values];
+  document.getElementById('sorter-filter-type').innerHTML = tabs.map(t =>
+    `<button data-val="${esc(t)}" class="tab-btn px-3 py-1.5 rounded-full text-sm border ${t === sorterPropertyType ? 'tab-active' : ''}"
+       style="border-color: var(--border); ${t === sorterPropertyType ? '' : 'background: var(--surface-1); color: var(--ink-2);'}">
+       ${t === 'all' ? 'All types' : esc(t)}</button>`).join('');
+  document.querySelectorAll('#sorter-filter-type .tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    sorterPropertyType = btn.dataset.val;
+    renderSorterTypeFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  }));
+}
+
+function renderSorterFileFilter() {
+  const field = fieldByName('source_file');
+  const values = field ? field.values : [];
+  const wrap = document.getElementById('sorter-filter-file-wrap');
+  const el = document.getElementById('sorter-filter-file');
+  if (wrap) wrap.classList.toggle('hidden', values.length <= 1);
+  if (values.length <= 1) { el.innerHTML = ''; return; }
+  const tabs = ['all', ...values];
+  el.innerHTML = tabs.map(t =>
+    `<button data-val="${esc(t)}" class="tab-btn px-3 py-1.5 rounded-full text-sm border ${t === sorterSourceFile ? 'tab-active' : ''}"
+       style="border-color: var(--border); ${t === sorterSourceFile ? '' : 'background: var(--surface-1); color: var(--ink-2);'}"
+       title="${esc(t)}">
+       ${t === 'all' ? 'All files' : esc(t.length > 20 ? t.substring(0, 17) + '...' : t)}</button>`).join('');
+  document.querySelectorAll('#sorter-filter-file .tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    sorterSourceFile = btn.dataset.val;
+    renderSorterFileFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  }));
+}
+
+// renderMultiPills is defined in app.js, shared with the dashboard's filter panel.
+function renderSorterConfigFilter() {
+  const field = fieldByName('configuration_required');
+  renderMultiPills('sorter-filter-config', 'sorter-filter-config-wrap', field ? field.values : [], sorterConfigFilter, () => {
+    renderSorterConfigFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  });
+}
+function renderSorterCallStatusFilter() {
+  const field = fieldByName('call_status');
+  renderMultiPills('sorter-filter-call-status', 'sorter-filter-call-status-wrap', field ? field.values : [], sorterCallStatusFilter, () => {
+    renderSorterCallStatusFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  });
+}
+function renderSorterBuyingStatusFilter() {
+  const field = fieldByName('buying_status');
+  renderMultiPills('sorter-filter-buying-status', 'sorter-filter-buying-status-wrap', field ? field.values : [], sorterBuyingStatusFilter, () => {
+    renderSorterBuyingStatusFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  });
+}
+
+function wireSorterFilters() {
+  wireFilterDropdown('sorter-filters-btn', 'sorter-filters-panel'); // defined in app.js
+  renderSorterTypeFilter();
+  renderSorterFileFilter();
+  renderSorterConfigFilter();
+  renderSorterCallStatusFilter();
+  renderSorterBuyingStatusFilter();
+
+  const min = document.getElementById('sorter-filter-budget-min');
+  const max = document.getElementById('sorter-filter-budget-max');
+  const applyBudget = () => {
+    sorterBudgetMin = min.value !== '' ? min.value : null;
+    sorterBudgetMax = max.value !== '' ? max.value : null;
+    updateSorterFiltersBadge();
+    refreshClassification();
+  };
+  min.addEventListener('change', applyBudget);
+  max.addEventListener('change', applyBudget);
+
+  const hwc = document.getElementById('sorter-filter-hwc-only');
+  hwc.addEventListener('change', () => {
+    sorterHwcOnly = hwc.checked;
+    updateSorterFiltersBadge();
+    refreshClassification();
+  });
+
+  document.getElementById('sorter-filters-clear').addEventListener('click', () => {
+    sorterPropertyType = 'all';
+    sorterSourceFile = 'all';
+    sorterBudgetMin = null;
+    sorterBudgetMax = null;
+    sorterConfigFilter = [];
+    sorterCallStatusFilter = [];
+    sorterBuyingStatusFilter = [];
+    sorterHwcOnly = false;
+    min.value = '';
+    max.value = '';
+    hwc.checked = false;
+    renderSorterTypeFilter();
+    renderSorterFileFilter();
+    renderSorterConfigFilter();
+    renderSorterCallStatusFilter();
+    renderSorterBuyingStatusFilter();
+    updateSorterFiltersBadge();
+    refreshClassification();
+  });
+
+  updateSorterFiltersBadge();
+}
+
 // Spreadsheet-style column letters (A, B, ... Z, AA, AB, ...) purely as a
 // faded visual anchor beside the field name — simpler at a glance than a
 // fill-rate percentage, and familiar from Excel.
@@ -45,6 +199,7 @@ async function initSorter() {
 
     renderRules();
     wireButtons();
+    wireSorterFilters();
     await refreshClassification();
   } catch (err) {
     document.getElementById('loading').textContent = '⚠ ' + err.message;
@@ -53,7 +208,8 @@ async function initSorter() {
 
 /* ── classification summary + preview ── */
 async function refreshClassification() {
-  const data = await fetchJSON(`/api/reports/${window.REPORT_ID}/classification`);
+  const q = filterQuery();
+  const data = await fetchJSON(`/api/reports/${window.REPORT_ID}/classification${q ? '?' + q : ''}`);
   const s = data.summary || {};
 
   document.getElementById('class-tiles').innerHTML =
@@ -118,7 +274,10 @@ let lastSummary = {};
 function renderDownloads(summary) {
   if (summary) lastSummary = summary;
   const s = lastSummary;
-  const q = exportColumns.length ? `?columns=${encodeURIComponent(exportColumns.join(','))}` : '';
+  const fq = filterQuery();
+  const colQ = exportColumns.length ? `columns=${encodeURIComponent(exportColumns.join(','))}` : '';
+  const xlsxQ = [colQ, fq].filter(Boolean).join('&');
+  const metaQ = fq;
   const base = `/api/reports/${window.REPORT_ID}/export`;
 
   // Tinted background + solid-colour text, not a solid fill with white text:
@@ -131,10 +290,10 @@ function renderDownloads(summary) {
     : `<span class="px-3 py-1.5 rounded-lg text-sm" style="background: var(--page); color: var(--muted);">${label} (0)</span>`;
 
   document.getElementById('download-buttons').innerHTML =
-    btn(`${base}/good.xlsx${q}`, '⬇ Good leads', s.good, '--success') +
-    btn(`${base}/bad.xlsx${q}`, '⬇ Bad leads', s.bad, '--error') +
-    btn(`${base}/unclassified.xlsx${q}`, '⬇ Unclassified', s.unclassified, '--tertiary') +
-    btn(`${base}/meta-audience.csv`, '⬇ Meta audience CSV', s.good, '--primary');
+    btn(`${base}/good.xlsx${xlsxQ ? '?' + xlsxQ : ''}`, '⬇ Good leads', s.good, '--success') +
+    btn(`${base}/bad.xlsx${xlsxQ ? '?' + xlsxQ : ''}`, '⬇ Bad leads', s.bad, '--error') +
+    btn(`${base}/unclassified.xlsx${xlsxQ ? '?' + xlsxQ : ''}`, '⬇ Unclassified', s.unclassified, '--tertiary') +
+    btn(`${base}/meta-audience.csv${metaQ ? '?' + metaQ : ''}`, '⬇ Meta audience CSV', s.good, '--primary');
 }
 
 /* ── rule editor ── */

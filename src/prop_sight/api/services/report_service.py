@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from ...analytics import rules
 from ...analytics.chart_summaries import generate_chart_summaries
 from ...analytics.core import hwc_flag
 from ...analytics.llm_insights import generate_insights
-from ...analytics.report import classify_frame, full_report
+from ...analytics.report import classify_frame, full_report, prepare_frame
 from ...ingestion.dedupe import dedupe_leads
 from ...ingestion.merge import merge_sheets
 from ..state import (
@@ -93,11 +95,65 @@ def confirm_report(report_id: str, sheets_by_index: dict[int, dict]) -> dict:
     }
 
 
+def csv_list(value: str | None) -> list[str] | None:
+    """Parse a comma-separated query param into a list, or None when empty."""
+    if not value:
+        return None
+    items = [v.strip() for v in value.split(",") if v.strip()]
+    return items or None
+
+
+def apply_filters(
+    df,
+    *,
+    property_type: str | None = None,
+    source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: list[str] | None = None,
+    call_status: list[str] | None = None,
+    buying_status: list[str] | None = None,
+    hwc_only: bool = False,
+):
+    """Narrow a raw lead frame by the filters the Reports and Sorter pages share.
+
+    Runs `prepare_frame` first so `budget_value`/`budget_bucket` exist and every
+    label (configuration/call/buying status) is folded the same way the charts
+    and rule engine see it — callers can hand this the untouched `entry["df"]`.
+    `budget_min`/`budget_max` are in Crore, matching the unit shown everywhere
+    else in the UI; `budget_value` is stored in Lakh internally.
+    """
+    df = prepare_frame(df)
+    if property_type:
+        df = df[df["property_type"] == property_type]
+    if source_file:
+        df = df[df["source_file"] == source_file]
+    if budget_min is not None:
+        df = df[pd.to_numeric(df["budget_value"], errors="coerce") >= budget_min * 100]
+    if budget_max is not None:
+        df = df[pd.to_numeric(df["budget_value"], errors="coerce") <= budget_max * 100]
+    if configuration:
+        df = df[df["configuration_required"].isin(configuration)]
+    if call_status:
+        df = df[df["call_status"].isin(call_status)]
+    if buying_status:
+        df = df[df["buying_status"].isin(buying_status)]
+    if hwc_only:
+        df = df[hwc_flag(df)]
+    return df
+
+
 def get_report_data(
     report_id: str,
     property_type: str | None = None,
     segment: str | None = None,
     source_file: str | None = None,
+    budget_min: float | None = None,
+    budget_max: float | None = None,
+    configuration: list[str] | None = None,
+    call_status: list[str] | None = None,
+    buying_status: list[str] | None = None,
+    hwc_only: bool = False,
 ) -> dict | None:
     """Cached full report, or a re-computed slice when filters are applied.
 
@@ -110,16 +166,30 @@ def get_report_data(
     no_type = not property_type or property_type.lower() == "all"
     no_segment = not segment or segment.lower() == "all"
     no_file = not source_file or source_file.lower() == "all"
+    no_extra = (
+        budget_min is None
+        and budget_max is None
+        and not configuration
+        and not call_status
+        and not buying_status
+        and not hwc_only
+    )
 
-    if no_type and no_segment and no_file:
+    if no_type and no_segment and no_file and no_extra:
         report = dict(entry["report"])
     else:
         rule_list = current_rules()
-        df = entry["df"]
-        if not no_type:
-            df = df[df["property_type"] == property_type]
-        if not no_file:
-            df = df[df["source_file"] == source_file]
+        df = apply_filters(
+            entry["df"],
+            property_type=None if no_type else property_type,
+            source_file=None if no_file else source_file,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            configuration=configuration,
+            call_status=call_status,
+            buying_status=buying_status,
+            hwc_only=hwc_only,
+        )
         if not no_segment:
             df = _apply_segment(df, segment.lower(), rule_list)
         report = full_report(df, rule_list)

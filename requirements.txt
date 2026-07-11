@@ -1,8 +1,10 @@
 fastapi
+pydantic
 uvicorn[standard]
 jinja2
 python-multipart
 pandas
+numpy
 pyarrow
 openpyxl
 python-dotenv
